@@ -16,10 +16,19 @@ Elite Dangerous の **Exobiology（生物学）** 支援を目的としたプロ
 - 周辺星系・Spansh 連携は将来拡張
 - UI は検証用CLIが成立した後に実装する
 
+## ランキング正本
+
+Exobiologyランキングの本番モデル・species predictionの昇格条件・First Footfall推定・confidence伝播・時間モデル・探索範囲の扱いは、以下を正本とします。
+
+- `docs/EXOBIOLOGY_RANKING_CANONICAL_SPEC_V0.1.md`
+
+Phase文書や実装ノートに暫定的な記述が残る場合も、本番仕様については正本を優先します。
+
 ## 主要ドキュメント
 
 Exobiology 関連の仕様・検証資料は `docs/` を参照してください。
 
+- `docs/EXOBIOLOGY_RANKING_CANONICAL_SPEC_V0.1.md`
 - `docs/EXOBIOLOGY_IMPLEMENTATION_NOTE_2026-09.md`
 - `docs/PHASE_3_BIO_VALUE_MODEL_V1_DESIGN_BASELINE_V0.1.md`
 - `docs/PHASE_BIO_SPECIES_PREDICTION_BACKTEST_DESIGN_BASELINE_V0.1.md`
