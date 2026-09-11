@@ -20,6 +20,10 @@ def _find_catalog(tree: ast.Module) -> ast.Dict | None:
                 if isinstance(target, ast.Name) and target.id == "catalog":
                     if isinstance(node.value, ast.Dict):
                         return node.value
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and node.target.id == "catalog":
+                if isinstance(node.value, ast.Dict):
+                    return node.value
     return None
 
 
