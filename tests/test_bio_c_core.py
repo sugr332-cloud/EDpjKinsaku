@@ -5,6 +5,7 @@ from app.bio.c_core import (
     CONCHA_RULES,
     FONTICULUA_RULES,
     FRUTEXA_RULES,
+    FUMEROLA_RULES,
     NormalizedRule,
     RuleEvaluation,
     RuleStatus,
@@ -14,6 +15,7 @@ from app.bio.c_core import (
     evaluate_concha,
     evaluate_fonticulua,
     evaluate_frutexa,
+    evaluate_fumerola,
     evaluate_genus_consistency,
     evaluate_rule,
 )
@@ -624,3 +626,129 @@ def test_frutexa_has_twelve_rulesets_across_seven_species() -> None:
         atmosphere=None, gravity=None, temperature=None, pressure=None, body_type=None, volcanism=None,
     )
     assert len(evaluate_frutexa(body)) == 7
+
+
+def test_fumerola_carbosis_matches_via_one_of_seven_rulesets() -> None:
+    body = BodyContext(
+        atmosphere="Argon",
+        gravity=0.2,
+        temperature=100.0,
+        pressure=None,
+        body_type="Icy body",
+        volcanism="carbon",
+    )
+
+    result = evaluate_fumerola(body)[0]
+
+    assert result.species_name == "Fumerola Carbosis"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_fumerola_extremus_matches_via_one_of_five_rulesets() -> None:
+    body = BodyContext(
+        atmosphere="Ammonia",
+        gravity=0.05,
+        temperature=170.0,
+        pressure=0.01,
+        body_type="Rocky body",
+        volcanism="silicate",
+    )
+
+    result = evaluate_fumerola(body)[1]
+
+    assert result.species_name == "Fumerola Extremus"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_fumerola_nitris_matches_via_one_of_six_rulesets() -> None:
+    body = BodyContext(
+        atmosphere="Neon",
+        gravity=0.1,
+        temperature=100.0,
+        pressure=None,
+        body_type="Icy body",
+        volcanism="nitrogen",
+    )
+
+    result = evaluate_fumerola(body)[2]
+
+    assert result.species_name == "Fumerola Nitris"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_fumerola_aquatis_matches_via_ninth_of_nine_rulesets() -> None:
+    """Aquatis has 9 alternative rulesets, the largest single-species OR
+    converted so far. This body fails rulesets 1-8 (wrong atmosphere) but
+    satisfies the 9th (Water, no temperature/pressure constraint)."""
+    body = BodyContext(
+        atmosphere="Water",
+        gravity=0.05,
+        temperature=None,
+        pressure=None,
+        body_type="Rocky body",
+        volcanism="water",
+    )
+
+    result = evaluate_fumerola(body)[3]
+
+    assert result.species_name == "Fumerola Aquatis"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_fumerola_aquatis_is_no_match_when_all_nine_rulesets_reject() -> None:
+    body = BodyContext(
+        atmosphere="Helium",
+        gravity=0.05,
+        temperature=None,
+        pressure=None,
+        body_type="Rocky body",
+        volcanism="water",
+    )
+
+    result = evaluate_fumerola(body)[3]
+
+    assert result.species_name == "Fumerola Aquatis"
+    assert result.status is RuleStatus.NO_MATCH
+
+
+def test_fumerola_aquatis_is_insufficient_data_when_no_ruleset_matches_and_some_lack_data() -> None:
+    """No ruleset can MATCH (atmosphere is missing entirely), but three of
+    the nine rulesets (1, 4, 8) have no other disqualifying field at this
+    gravity, leaving only missing-data checks -- so the aggregated verdict
+    must be INSUFFICIENT_DATA, not NO_MATCH, even though the other six
+    rulesets are outright rejected by body_type or gravity."""
+    body = BodyContext(
+        atmosphere=None,
+        gravity=0.276,
+        temperature=None,
+        pressure=None,
+        body_type="Rocky body",
+        volcanism=None,
+    )
+
+    result = evaluate_fumerola(body)[3]
+
+    assert result.species_name == "Fumerola Aquatis"
+    assert result.status is RuleStatus.INSUFFICIENT_DATA
+
+
+def test_fumerola_values_match_species_value_master() -> None:
+    from app.bio.species_value_master import SPECIES_VALUE_MASTER
+
+    seen_codes: set[str] = set()
+    for rule in FUMEROLA_RULES:
+        seen_codes.add(rule.species_code)
+        master_entry = SPECIES_VALUE_MASTER[rule.species_code]
+        assert rule.species_name == master_entry.name
+        assert rule.value == master_entry.value
+        assert master_entry.confidence == "confirmed"
+    assert len(seen_codes) == 4
+
+
+def test_fumerola_has_twenty_seven_rulesets_across_four_species() -> None:
+    """Every Fumerola species is an OR case (no single-ruleset species)."""
+    assert len(FUMEROLA_RULES) == 27
+    body = BodyContext(
+        atmosphere=None, gravity=None, temperature=None, pressure=None, body_type=None, volcanism=None,
+    )
+    assert len(evaluate_fumerola(body)) == 4
