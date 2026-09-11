@@ -257,6 +257,80 @@ V1 expected value:
 
 判定ロジックと価値ランキングを分離する。
 
+## Phase 11 — AI / TTS（VOICEVOX）
+
+候補種判定・Navigation・Current Body の各情報が安定した後、AIによる推奨・説明を音声で提示する層を追加する。
+
+### 目的
+
+ゲームプレイ中に画面を注視できない場面でも、C-COREの判定結果やNavigation情報をAIが要約し、音声で通知できるようにする。
+
+### アーキテクチャ
+
+```text
+EliteIntel
+   │
+   ├─ Game Context
+   ├─ C-CORE Result
+   └─ Mission / Navigation / Exobiology
+          ↓
+       AI Provider
+       ├─ Gemini CLI
+       └─ Claude CLI
+          ↓
+      日本語テキスト
+          ↓
+       TTS Provider
+          ↓
+       VOICEVOX
+          ↓
+        Speaker
+```
+
+4層に分離し、責務を混同しない。
+
+```text
+C-CORE      = 判定
+EliteIntel  = ゲーム状態・UI
+Gemini/Claude = 推奨・説明
+VOICEVOX    = 音声化
+```
+
+VOICEVOXを「AIそのもの」として扱わない。VOICEVOXはTTS Providerの一実装であり、AIの判断・回答生成には関与しない。
+
+### 設計方針
+
+- AIの判断・回答生成は Gemini CLI / Claude CLI が担う
+- 音声合成は VOICEVOX が担う
+- VOICEVOX はローカル Windows 上で実行し、**外部 TTS API は使用しない**
+- 音声出力は任意機能とする。VOICEVOXが無効・未起動でもテキスト表示のみで動作する
+- TTS を抽象化する TTS Provider 層を設け、将来的に別の音声エンジンへ交換可能にする（VOICEVOX を C-CORE / EliteIntel 本体へ直接埋め込まない）
+- 音声読み上げ用の AI 回答は短く簡潔にする
+- ゲームプレイ中の通知・推奨・警告などを対象に音声化する
+
+### 例
+
+```text
+「現在の惑星では、Aleoida Arcusが候補です。採取を続ける価値があります。」
+      ↓
+   VOICEVOX（例: 青山龍星）
+      ↓
+    音声出力
+```
+
+話者（ボイス）はTTS Provider層の設定として扱い、差し替えてもシステム設計を変更する必要がないようにする。
+
+### ライセンス・クレジット
+
+VOICEVOXおよび各音声ライブラリは無料で利用できるが、音声ライブラリごとに利用規約・クレジット表記の条件が異なる。使用する音声ライブラリの利用規約・クレジット条件を仕様書に明記し、遵守する。
+
+### 完了条件
+
+- C-CORE判定結果を含むAI回答が生成される
+- AI回答がVOICEVOX経由で音声出力される
+- VOICEVOX未起動時もテキスト表示のみで動作が継続する
+- 使用する音声ライブラリの利用規約・クレジット表記が明記されている
+
 ## HUD 最終イメージ
 
 ```text
@@ -296,6 +370,7 @@ V1 expected value:
 - C-CORE integration tests
 - Journal replay / persistence tests
 - real-game test
+- AI Provider / TTS Provider abstraction tests（VOICEVOX未起動時にテキスト表示へフォールバックすることを含む）
 
 実ゲームだけをテスト基準にせず、固定 fixture で C-CORE との接続を先に検証する。
 
@@ -307,6 +382,8 @@ V1 expected value:
 - 初期段階で C-CORE を Java へ全面 port しない
 - C-CORE に合わせるため EliteIntel の Session model を無理に変更しない
 - 実ゲームテストだけに依存しない
+- VOICEVOX（TTS）を AI の判断・回答生成そのものとして扱わない
+- 外部 TTS API に依存させない（VOICEVOX はローカル実行を前提とする）
 
 ## Commit sequence proposal
 
@@ -319,6 +396,7 @@ V1 expected value:
 7. `feat(bio): integrate all C-CORE species`
 8. `feat(hud): add navigation and body information`
 9. `feat(bio): add exobiology value ranking`
+10. `feat(ai): add AI provider and TTS provider abstraction (VOICEVOX)`
 
 ## First implementation step
 
