@@ -27,6 +27,7 @@
 | ID | 対象 | ruleset上の条件 | `value_estimate()`での扱い | Cでの扱い | 判断根拠 | 状態 | 実装状態 |
 |---|---|---|---|---|---|---|---|
 | BUD-001 | Brain Tree (`region`) | ruleset側では `regions` を正規化上の条件として扱う | `region` を参照しているため ruleset と不一致 | ruleset の `regions` を正として扱う | `region` / `regions` の単複不一致。Brain Tree の条件記述における明確な表記差異として記録 | OPEN | NOT_IMPLEMENTED |
+| BUD-002 | Stratum (`$Codex_Ent_Stratum_04_Name;`、`stratum.py`) | `catalog`直下（genus階層の外）に、`$Codex_Ent_Stratum_04_Name;`を種コードとする孤立エントリが存在する。`name: 'Stratum Aranaemus'`、`rulesets: []`（0件）。一方、正規のgenus階層(`$Codex_Ent_Stratum_Genus_Name;`)内にも同一種コード`$Codex_Ent_Stratum_04_Name;`で`name: 'Stratum Araneamus'`、`rulesets`1件のエントリが別途存在する（綴りが"Aranaemus"と"Araneamus"で異なる） | 未調査（`app/bio/value.py`等の現行`value_estimate()`がStratum genusをどう扱っているか未確認） | 現時点でC-CORE(`app/bio/c_core.py`)はAleoida属のみ実装済みで、Stratum genusは未変換のため影響なし | `scripts/count_bioscan_rulesets.py`のAnnAssign対応修正後、baseline commit `5f0d2e445a95681bf2e85223f883d5c552a7726b`に対して19ファイル全走査した際に発見。genus_entries合計が19ファイルに対し20となる原因はこの孤立エントリ。typo(綴り違い)か仕様上の別種かは未確定のため判断を保留する | OPEN | NOT_IMPLEMENTED |
 
 ## 3. 状態定義
 
@@ -117,3 +118,4 @@ BioScan が更新された場合、既存台帳を無条件に現在版へ上書
 
 - 2026-09-11: 初版。116 Species の集計開始前に、不整合を会話履歴ではなくリポジトリ上で継続管理する運用を追加。
 - 2026-09-11: 判断状態と実装状態を分離。`RESOLVED_UPSTREAM` を評価器バグ修正と ruleset / 価値データ変更に分岐させ、後者では `NOT_IMPLEMENTED` へ戻す運用を追加。BioScan baseline commit `5f0d2e445a95681bf2e85223f883d5c552a7726b` を明記。
+- 2026-09-11: `scripts/count_bioscan_rulesets.py`の`ast.AnnAssign`対応修正後、baseline全19ファイルの走査でStratum genusの構造異常(`$Codex_Ent_Stratum_04_Name;`の孤立エントリ、Aranaemus/Araneamusの綴り違い)を発見し、BUD-002として追加。
