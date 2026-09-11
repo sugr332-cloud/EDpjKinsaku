@@ -3,6 +3,7 @@ from app.bio.c_core import (
     BodyContext,
     CACTOIDA_RULES,
     CONCHA_RULES,
+    FONTICULUA_RULES,
     NormalizedRule,
     RuleEvaluation,
     RuleStatus,
@@ -10,6 +11,7 @@ from app.bio.c_core import (
     evaluate_aleoida,
     evaluate_cactoida,
     evaluate_concha,
+    evaluate_fonticulua,
     evaluate_genus_consistency,
     evaluate_rule,
 )
@@ -417,3 +419,87 @@ def test_concha_has_eight_rulesets_across_four_species() -> None:
         atmosphere=None, gravity=None, temperature=None, pressure=None, body_type=None, volcanism=None,
     )
     assert len(evaluate_concha(body)) == 4
+
+
+def test_fonticulua_segmentatus_matches_boundary_values_inclusive() -> None:
+    body = BodyContext(
+        atmosphere="Neon",
+        gravity=0.25,
+        temperature=50.0,
+        pressure=0.006,
+        body_type="Icy body",
+        volcanism="None",
+    )
+
+    result = evaluate_fonticulua(body)[0]
+
+    assert result.species_name == "Fonticulua Segmentatus"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_fonticulua_campestris_ignores_volcanism_when_ruleset_has_no_constraint() -> None:
+    """None of Fonticulua's 6 rulesets constrain volcanism at all --
+    missing volcanism data must never become INSUFFICIENT_DATA here."""
+    body = BodyContext(
+        atmosphere="Argon",
+        gravity=0.10,
+        temperature=100.0,
+        pressure=None,
+        body_type="Rocky ice body",
+        volcanism=None,
+    )
+
+    result = evaluate_fonticulua(body)[1]
+
+    assert result.species_name == "Fonticulua Campestris"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_fonticulua_fluctus_and_digitos_transcribed_values() -> None:
+    fluctus = evaluate_fonticulua(
+        BodyContext(
+            atmosphere="Oxygen",
+            gravity=0.25,
+            temperature=150.0,
+            pressure=0.02,
+            body_type="Icy body",
+            volcanism=None,
+        )
+    )[4]
+    digitos = evaluate_fonticulua(
+        BodyContext(
+            atmosphere="Methane",
+            gravity=0.05,
+            temperature=90.0,
+            pressure=0.05,
+            body_type="Rocky ice body",
+            volcanism=None,
+        )
+    )[5]
+
+    assert fluctus.species_name == "Fonticulua Fluctus"
+    assert fluctus.status is RuleStatus.MATCH
+    assert digitos.species_name == "Fonticulua Digitos"
+    assert digitos.status is RuleStatus.MATCH
+
+
+def test_fonticulua_values_match_species_value_master() -> None:
+    from app.bio.species_value_master import SPECIES_VALUE_MASTER
+
+    seen_codes: set[str] = set()
+    for rule in FONTICULUA_RULES:
+        seen_codes.add(rule.species_code)
+        master_entry = SPECIES_VALUE_MASTER[rule.species_code]
+        assert rule.species_name == master_entry.name
+        assert rule.value == master_entry.value
+        assert master_entry.confidence == "confirmed"
+    assert len(seen_codes) == 6
+
+
+def test_fonticulua_has_six_rulesets_across_six_species() -> None:
+    """One ruleset per species (like Aleoida) -- no OR case here."""
+    assert len(FONTICULUA_RULES) == 6
+    body = BodyContext(
+        atmosphere=None, gravity=None, temperature=None, pressure=None, body_type=None, volcanism=None,
+    )
+    assert len(evaluate_fonticulua(body)) == 6

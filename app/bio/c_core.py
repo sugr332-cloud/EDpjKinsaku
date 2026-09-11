@@ -2,10 +2,10 @@
 
 Started with one genus (Aleoida, all species single-ruleset) so the
 normalized rule representation and evaluator could be exercised before all
-116 species are converted; Cactoida and Concha followed with the same
-NormalizedRule/evaluate_rule schema unchanged. BioScan ruleset wording is
-treated as the upstream input; the evaluator does not copy BioScan's
-evaluator implementation.
+116 species are converted; Cactoida, Concha, and Fonticulua followed with
+the same NormalizedRule/evaluate_rule schema unchanged. BioScan ruleset
+wording is treated as the upstream input; the evaluator does not copy
+BioScan's evaluator implementation.
 
 Statuses are explicit:
 - MATCH: all available rule predicates are satisfied.
@@ -504,3 +504,91 @@ def evaluate_concha(body: BodyContext) -> list[RuleEvaluation]:
     """
     per_ruleset = [evaluate_rule(rule, body) for rule in CONCHA_RULES]
     return aggregate_species_evaluations(per_ruleset)
+
+
+# Fonticulua: all 6 species have exactly one ruleset each (like Aleoida),
+# and none constrain volcanism at all.
+FONTICULUA_RULES: tuple[NormalizedRule, ...] = (
+    NormalizedRule(
+        species_code="$Codex_Ent_Fonticulus_01_Name;",
+        species_name="Fonticulua Segmentatus",
+        value=19010800,
+        atmospheres=frozenset({"Neon", "NeonRich"}),
+        min_gravity=0.25,
+        max_gravity=0.276,
+        min_temperature=50.0,
+        max_temperature=75.0,
+        max_pressure=0.006,
+        body_types=frozenset({"Icy body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Fonticulus_02_Name;",
+        species_name="Fonticulua Campestris",
+        value=1000000,
+        atmospheres=frozenset({"Argon"}),
+        min_gravity=0.027,
+        max_gravity=0.276,
+        min_temperature=50.0,
+        max_temperature=150.0,
+        body_types=frozenset({"Icy body", "Rocky ice body"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Fonticulus_03_Name;",
+        species_name="Fonticulua Upupam",
+        value=5727600,
+        atmospheres=frozenset({"ArgonRich"}),
+        min_gravity=0.209,
+        max_gravity=0.276,
+        min_temperature=61.0,
+        max_temperature=125.0,
+        min_pressure=0.0175,
+        body_types=frozenset({"Icy body", "Rocky ice body"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Fonticulus_04_Name;",
+        species_name="Fonticulua Lapida",
+        value=3111000,
+        atmospheres=frozenset({"Nitrogen"}),
+        min_gravity=0.19,
+        max_gravity=0.276,
+        min_temperature=50.0,
+        max_temperature=81.0,
+        body_types=frozenset({"Icy body", "Rocky ice body"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Fonticulus_05_Name;",
+        species_name="Fonticulua Fluctus",
+        value=20000000,
+        atmospheres=frozenset({"Oxygen"}),
+        min_gravity=0.235,
+        max_gravity=0.276,
+        min_temperature=143.0,
+        max_temperature=200.0,
+        min_pressure=0.012,
+        body_types=frozenset({"Icy body"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Fonticulus_06_Name;",
+        species_name="Fonticulua Digitos",
+        value=1804100,
+        atmospheres=frozenset({"Methane"}),
+        min_gravity=0.025,
+        max_gravity=0.07,
+        min_temperature=83.0,
+        max_temperature=109.0,
+        min_pressure=0.03,
+        body_types=frozenset({"Icy body", "Rocky ice body"}),
+    ),
+)
+
+
+def evaluate_fonticulua(body: BodyContext) -> list[RuleEvaluation]:
+    """Evaluate the six Fonticulua species rules in deterministic order.
+
+    Every species has exactly one ruleset (no OR case here), so this
+    mirrors evaluate_aleoida() rather than the aggregate_species_evaluations()
+    path used by evaluate_cactoida()/evaluate_concha() -- routing single-
+    ruleset genera through the aggregator would be a no-op, not a bug fix.
+    """
+    return [evaluate_rule(rule, body) for rule in FONTICULUA_RULES]
