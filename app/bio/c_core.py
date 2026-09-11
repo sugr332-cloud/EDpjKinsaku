@@ -2,10 +2,10 @@
 
 Started with one genus (Aleoida, all species single-ruleset) so the
 normalized rule representation and evaluator could be exercised before all
-116 species are converted; Cactoida followed as the second genus, converted
-with the same NormalizedRule/evaluate_rule schema unchanged. BioScan ruleset
-wording is treated as the upstream input; the evaluator does not copy
-BioScan's evaluator implementation.
+116 species are converted; Cactoida and Concha followed with the same
+NormalizedRule/evaluate_rule schema unchanged. BioScan ruleset wording is
+treated as the upstream input; the evaluator does not copy BioScan's
+evaluator implementation.
 
 Statuses are explicit:
 - MATCH: all available rule predicates are satisfied.
@@ -23,10 +23,11 @@ Region semantics follow the ruleset representation: positive region names
 must be present, while names prefixed with ``!`` must be absent.
 
 A species can have more than one ruleset upstream (e.g. Cactoida Vermis'
-three alternatives): BioScan ORs them -- any one ruleset matching makes the
-species a candidate. NormalizedRule stays one-ruleset-per-entry (several
-entries may share a species_code), and aggregate_species_evaluations()
-collapses per-ruleset evaluations down to one verdict per species_code.
+three alternatives, or Concha Renibus' five): BioScan ORs them -- any one
+ruleset matching makes the species a candidate. NormalizedRule stays
+one-ruleset-per-entry (several entries may share a species_code), and
+aggregate_species_evaluations() collapses per-ruleset evaluations down to
+one verdict per species_code.
 """
 from __future__ import annotations
 
@@ -383,4 +384,123 @@ def evaluate_cactoida(body: BodyContext) -> list[RuleEvaluation]:
     returned list has exactly one verdict per species, like evaluate_aleoida().
     """
     per_ruleset = [evaluate_rule(rule, body) for rule in CACTOIDA_RULES]
+    return aggregate_species_evaluations(per_ruleset)
+
+
+CONCHA_RULES: tuple[NormalizedRule, ...] = (
+    # Concha Renibus has five alternative rulesets upstream (OR'd), the
+    # largest species-level OR case converted so far (Cactoida Vermis had
+    # three) -- collapsed the same way by aggregate_species_evaluations()
+    # in evaluate_concha().
+    NormalizedRule(
+        species_code="$Codex_Ent_Conchas_01_Name;",
+        species_name="Concha Renibus",
+        value=4572400,
+        atmospheres=frozenset({"Ammonia"}),
+        min_gravity=0.04,
+        max_gravity=0.045,
+        min_temperature=176.0,
+        max_temperature=177.0,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"silicate", "metallic"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Conchas_01_Name;",
+        species_name="Concha Renibus",
+        value=4572400,
+        atmospheres=frozenset({"CarbonDioxide"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=180.0,
+        min_pressure=0.025,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Conchas_01_Name;",
+        species_name="Concha Renibus",
+        value=4572400,
+        atmospheres=frozenset({"Methane"}),
+        min_gravity=0.04,
+        max_gravity=0.15,
+        min_temperature=78.0,
+        max_temperature=100.0,
+        min_pressure=0.01,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"silicate", "metallic"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Conchas_01_Name;",
+        species_name="Concha Renibus",
+        value=4572400,
+        atmospheres=frozenset({"Water"}),
+        min_gravity=0.04,
+        max_gravity=0.65,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Conchas_01_Name;",
+        species_name="Concha Renibus",
+        value=4572400,
+        atmospheres=frozenset({"Water"}),
+        min_gravity=0.04,
+        max_gravity=0.65,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"water"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Conchas_02_Name;",
+        species_name="Concha Aureolas",
+        value=7774700,
+        atmospheres=frozenset({"Ammonia"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=152.0,
+        max_temperature=177.0,
+        max_pressure=0.0135,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Conchas_03_Name;",
+        species_name="Concha Labiata",
+        value=2352400,
+        atmospheres=frozenset({"CarbonDioxide"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=150.0,
+        max_temperature=200.0,
+        min_pressure=0.002,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+    # BioScan's raw catalog value for Biconcavis is 16777215 (2**24-1, an
+    # integer-overflow-shaped number) -- species_value_master.py's
+    # cross-reference investigation already corrected this to 19010800
+    # (confidence="disputed", matching Fonticulua Segmentatus/Tussock
+    # Stigmasis). NormalizedRule.value uses that corrected figure, not the
+    # BioScan raw value.
+    NormalizedRule(
+        species_code="$Codex_Ent_Conchas_04_Name;",
+        species_name="Concha Biconcavis",
+        value=19010800,
+        atmospheres=frozenset({"Nitrogen"}),
+        min_gravity=0.053,
+        max_gravity=0.275,
+        min_temperature=42.0,
+        max_temperature=52.0,
+        max_pressure=0.0047,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+)
+
+
+def evaluate_concha(body: BodyContext) -> list[RuleEvaluation]:
+    """Evaluate the four Concha species, OR-collapsing Renibus' five
+    alternative rulesets via aggregate_species_evaluations() so the
+    returned list has exactly one verdict per species, like evaluate_aleoida()
+    and evaluate_cactoida().
+    """
+    per_ruleset = [evaluate_rule(rule, body) for rule in CONCHA_RULES]
     return aggregate_species_evaluations(per_ruleset)

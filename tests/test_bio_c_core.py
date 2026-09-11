@@ -2,12 +2,14 @@ from app.bio.c_core import (
     ALEOIDA_RULES,
     BodyContext,
     CACTOIDA_RULES,
+    CONCHA_RULES,
     NormalizedRule,
     RuleEvaluation,
     RuleStatus,
     aggregate_species_evaluations,
     evaluate_aleoida,
     evaluate_cactoida,
+    evaluate_concha,
     evaluate_genus_consistency,
     evaluate_rule,
 )
@@ -299,3 +301,119 @@ def test_aggregate_species_evaluations_preserves_first_seen_species_order() -> N
     aggregated = aggregate_species_evaluations(evaluations)
 
     assert [result.species_code for result in aggregated] == ["b", "a"]
+
+
+def test_concha_renibus_matches_via_fourth_of_five_rulesets() -> None:
+    """Renibus has 5 alternative rulesets (the largest OR case converted
+    so far). This body fails rulesets 1-3 and 5 but satisfies ruleset 4
+    (Water atmosphere, volcanism None), so the aggregated verdict must be
+    MATCH."""
+    body = BodyContext(
+        atmosphere="Water",
+        gravity=0.3,
+        temperature=None,
+        pressure=None,
+        body_type="Rocky body",
+        volcanism="None",
+    )
+
+    result = evaluate_concha(body)[0]
+
+    assert result.species_name == "Concha Renibus"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_concha_renibus_is_no_match_when_all_five_rulesets_reject() -> None:
+    body = BodyContext(
+        atmosphere="Argon",
+        gravity=0.3,
+        temperature=None,
+        pressure=None,
+        body_type="Rocky body",
+        volcanism="None",
+    )
+
+    result = evaluate_concha(body)[0]
+
+    assert result.species_name == "Concha Renibus"
+    assert result.status is RuleStatus.NO_MATCH
+
+
+def test_concha_aureolas_ignores_volcanism_when_ruleset_has_no_constraint() -> None:
+    body = BodyContext(
+        atmosphere="Ammonia",
+        gravity=0.10,
+        temperature=160.0,
+        pressure=0.01,
+        body_type="Rocky body",
+        volcanism=None,
+    )
+
+    result = evaluate_concha(body)[1]
+
+    assert result.species_name == "Concha Aureolas"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_concha_labiata_matches_boundary_values_inclusive() -> None:
+    body = BodyContext(
+        atmosphere="CarbonDioxide",
+        gravity=0.04,
+        temperature=150.0,
+        pressure=0.002,
+        body_type="Rocky body",
+        volcanism="None",
+    )
+
+    result = evaluate_concha(body)[2]
+
+    assert result.species_name == "Concha Labiata"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_concha_biconcavis_matches_boundary_values_inclusive() -> None:
+    body = BodyContext(
+        atmosphere="Nitrogen",
+        gravity=0.053,
+        temperature=42.0,
+        pressure=0.0047,
+        body_type="Rocky body",
+        volcanism="None",
+    )
+
+    result = evaluate_concha(body)[3]
+
+    assert result.species_name == "Concha Biconcavis"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_concha_biconcavis_value_uses_species_value_master_not_bioscan_raw() -> None:
+    """BioScan's raw catalog value for Biconcavis is 16777215 (2**24-1, an
+    integer-overflow-shaped number); species_value_master.py's
+    cross-reference investigation corrected this to 19010800. The
+    NormalizedRule must carry the corrected figure, never the raw one."""
+    biconcavis_rules = [rule for rule in CONCHA_RULES if rule.species_code == "$Codex_Ent_Conchas_04_Name;"]
+
+    assert len(biconcavis_rules) == 1
+    assert biconcavis_rules[0].value == 19010800
+    assert all(rule.value != 16777215 for rule in CONCHA_RULES)
+
+
+def test_concha_values_match_species_value_master() -> None:
+    from app.bio.species_value_master import SPECIES_VALUE_MASTER
+
+    seen_codes: set[str] = set()
+    for rule in CONCHA_RULES:
+        seen_codes.add(rule.species_code)
+        master_entry = SPECIES_VALUE_MASTER[rule.species_code]
+        assert rule.species_name == master_entry.name
+        assert rule.value == master_entry.value
+    assert len(seen_codes) == 4
+
+
+def test_concha_has_eight_rulesets_across_four_species() -> None:
+    assert len(CONCHA_RULES) == 8
+    body = BodyContext(
+        atmosphere=None, gravity=None, temperature=None, pressure=None, body_type=None, volcanism=None,
+    )
+    assert len(evaluate_concha(body)) == 4
