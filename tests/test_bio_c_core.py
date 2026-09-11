@@ -4,6 +4,7 @@ from app.bio.c_core import (
     NormalizedRule,
     RuleStatus,
     evaluate_aleoida,
+    evaluate_genus_consistency,
     evaluate_rule,
 )
 
@@ -72,7 +73,7 @@ def test_aleoida_spica_is_insufficient_without_region_data() -> None:
     assert result.status is RuleStatus.INSUFFICIENT_DATA
 
 
-def test_invalid_rule_is_reported_as_ruleset_inconsistency() -> None:
+def test_invalid_rule_is_reported_as_rule_definition_error() -> None:
     rule = NormalizedRule(
         species_code="test",
         species_name="Test",
@@ -91,8 +92,46 @@ def test_invalid_rule_is_reported_as_ruleset_inconsistency() -> None:
 
     result = evaluate_rule(rule, body)
 
-    assert result.status is RuleStatus.RULESET_INCONSISTENCY
+    assert result.status is RuleStatus.RULE_DEFINITION_ERROR
     assert "minimum exceeds maximum" in result.reason
+
+
+def test_genus_inconsistency_requires_established_genus_and_all_rejected() -> None:
+    evaluations = [
+        evaluate_rule(
+            NormalizedRule(
+                species_code=f"test-{index}",
+                species_name=f"Test {index}",
+                value=1,
+                atmospheres=frozenset({"CarbonDioxide"}),
+            ),
+            BodyContext(
+                atmosphere="Ammonia",
+                gravity=None,
+                temperature=None,
+                pressure=None,
+                body_type=None,
+                volcanism=None,
+            ),
+        )
+        for index in range(2)
+    ]
+
+    assert evaluate_genus_consistency(True, evaluations) is RuleStatus.RULESET_INCONSISTENCY
+    assert evaluate_genus_consistency(False, evaluations) is None
+
+
+def test_genus_inconsistency_does_not_mask_insufficient_data() -> None:
+    evaluations = [
+        RuleEvaluation(
+            species_code="test",
+            species_name="Test",
+            status=RuleStatus.INSUFFICIENT_DATA,
+            reason="missing",
+        )
+    ]
+
+    assert evaluate_genus_consistency(True, evaluations) is None
 
 
 def test_aleoida_has_five_rules() -> None:
