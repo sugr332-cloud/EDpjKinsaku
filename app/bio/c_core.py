@@ -1,9 +1,11 @@
-"""C-CORE ruleset normalization/evaluation — first vertical slice.
+"""C-CORE ruleset normalization/evaluation.
 
-This module deliberately starts with one genus (Aleoida) so the normalized
-rule representation and evaluator can be exercised before all 116 species
-are converted. BioScan ruleset wording is treated as the upstream input;
-the evaluator does not copy BioScan's evaluator implementation.
+Started with one genus (Aleoida, all species single-ruleset) so the
+normalized rule representation and evaluator could be exercised before all
+116 species are converted; Cactoida followed as the second genus, converted
+with the same NormalizedRule/evaluate_rule schema unchanged. BioScan ruleset
+wording is treated as the upstream input; the evaluator does not copy
+BioScan's evaluator implementation.
 
 Statuses are explicit:
 - MATCH: all available rule predicates are satisfied.
@@ -19,6 +21,12 @@ kept separate from that runtime signal.
 
 Region semantics follow the ruleset representation: positive region names
 must be present, while names prefixed with ``!`` must be absent.
+
+A species can have more than one ruleset upstream (e.g. Cactoida Vermis'
+three alternatives): BioScan ORs them -- any one ruleset matching makes the
+species a candidate. NormalizedRule stays one-ruleset-per-entry (several
+entries may share a species_code), and aggregate_species_evaluations()
+collapses per-ruleset evaluations down to one verdict per species_code.
 """
 from __future__ import annotations
 
@@ -160,6 +168,47 @@ def evaluate_genus_consistency(
     return None
 
 
+_SPECIES_AGGREGATE_PRIORITY: tuple[RuleStatus, ...] = (
+    RuleStatus.MATCH,
+    RuleStatus.INSUFFICIENT_DATA,
+    RuleStatus.RULE_DEFINITION_ERROR,
+    RuleStatus.NO_MATCH,
+)
+
+
+def aggregate_species_evaluations(evaluations: list[RuleEvaluation]) -> list[RuleEvaluation]:
+    """Collapse multiple per-ruleset evaluations for the same species_code
+    into one verdict, since BioScan's rulesets are ORed within a species:
+    any one matching ruleset makes the species a candidate.
+
+    Priority when no ruleset matches is
+    MATCH > INSUFFICIENT_DATA > RULE_DEFINITION_ERROR > NO_MATCH -- an
+    unresolved "might still be possible" (INSUFFICIENT_DATA) outranks a
+    broken rule definition elsewhere in the same species, and only "every
+    ruleset explicitly rejects this body" collapses to NO_MATCH.
+
+    Species are returned in the order their species_code first appears;
+    the reason is taken from the first evaluation matching the chosen
+    status, for determinism.
+    """
+    by_species: dict[str, list[RuleEvaluation]] = {}
+    order: list[str] = []
+    for evaluation in evaluations:
+        if evaluation.species_code not in by_species:
+            by_species[evaluation.species_code] = []
+            order.append(evaluation.species_code)
+        by_species[evaluation.species_code].append(evaluation)
+
+    aggregated: list[RuleEvaluation] = []
+    for species_code in order:
+        group = by_species[species_code]
+        statuses = {result.status for result in group}
+        chosen_status = next(status for status in _SPECIES_AGGREGATE_PRIORITY if status in statuses)
+        winner = next(result for result in group if result.status is chosen_status)
+        aggregated.append(RuleEvaluation(species_code, winner.species_name, chosen_status, winner.reason))
+    return aggregated
+
+
 ALEOIDA_RULES: tuple[NormalizedRule, ...] = (
     NormalizedRule(
         species_code="$Codex_Ent_Aleoids_01_Name;",
@@ -232,3 +281,106 @@ ALEOIDA_RULES: tuple[NormalizedRule, ...] = (
 def evaluate_aleoida(body: BodyContext) -> list[RuleEvaluation]:
     """Evaluate the five Aleoida species rules in deterministic order."""
     return [evaluate_rule(rule, body) for rule in ALEOIDA_RULES]
+
+
+CACTOIDA_RULES: tuple[NormalizedRule, ...] = (
+    NormalizedRule(
+        species_code="$Codex_Ent_Cactoid_01_Name;",
+        species_name="Cactoida Cortexum",
+        value=3667600,
+        atmospheres=frozenset({"CarbonDioxide"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=180.0,
+        max_temperature=197.0,
+        min_pressure=0.025,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"None"}),
+        regions=("orion-cygnus",),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Cactoid_02_Name;",
+        species_name="Cactoida Lapis",
+        value=2483600,
+        atmospheres=frozenset({"Ammonia"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=160.0,
+        max_temperature=177.0,
+        max_pressure=0.0135,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        regions=("sagittarius-carina",),
+    ),
+    # Cactoida Vermis has three alternative rulesets upstream (OR'd) --
+    # all three appear here sharing the same species_code, and
+    # evaluate_cactoida() collapses them via aggregate_species_evaluations().
+    NormalizedRule(
+        species_code="$Codex_Ent_Cactoid_03_Name;",
+        species_name="Cactoida Vermis",
+        value=16202800,
+        atmospheres=frozenset({"SulphurDioxide"}),
+        min_gravity=0.265,
+        max_gravity=0.276,
+        min_temperature=160.0,
+        max_temperature=210.0,
+        max_pressure=0.005,
+        body_types=frozenset({"Rocky body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Cactoid_03_Name;",
+        species_name="Cactoida Vermis",
+        value=16202800,
+        atmospheres=frozenset({"Water"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Cactoid_03_Name;",
+        species_name="Cactoida Vermis",
+        value=16202800,
+        atmospheres=frozenset({"Water"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"water"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Cactoid_04_Name;",
+        species_name="Cactoida Pullulanta",
+        value=3667600,
+        atmospheres=frozenset({"CarbonDioxide"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=180.0,
+        max_temperature=197.0,
+        min_pressure=0.025,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        volcanisms=frozenset({"None"}),
+        regions=("perseus",),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Cactoid_05_Name;",
+        species_name="Cactoida Peperatis",
+        value=2483600,
+        atmospheres=frozenset({"Ammonia"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=160.0,
+        max_temperature=177.0,
+        max_pressure=0.0135,
+        body_types=frozenset({"Rocky body", "High metal content body"}),
+        regions=("scutum-centaurus",),
+    ),
+)
+
+
+def evaluate_cactoida(body: BodyContext) -> list[RuleEvaluation]:
+    """Evaluate the five Cactoida species, OR-collapsing Vermis' three
+    alternative rulesets via aggregate_species_evaluations() so the
+    returned list has exactly one verdict per species, like evaluate_aleoida().
+    """
+    per_ruleset = [evaluate_rule(rule, body) for rule in CACTOIDA_RULES]
+    return aggregate_species_evaluations(per_ruleset)
