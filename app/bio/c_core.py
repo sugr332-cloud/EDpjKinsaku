@@ -2,10 +2,10 @@
 
 Started with one genus (Aleoida, all species single-ruleset) so the
 normalized rule representation and evaluator could be exercised before all
-116 species are converted; Cactoida, Concha, and Fonticulua followed with
-the same NormalizedRule/evaluate_rule schema unchanged. BioScan ruleset
-wording is treated as the upstream input; the evaluator does not copy
-BioScan's evaluator implementation.
+116 species are converted; Cactoida, Concha, Fonticulua, and Frutexa
+followed with the same NormalizedRule/evaluate_rule schema unchanged.
+BioScan ruleset wording is treated as the upstream input; the evaluator
+does not copy BioScan's evaluator implementation.
 
 Statuses are explicit:
 - MATCH: all available rule predicates are satisfied.
@@ -592,3 +592,173 @@ def evaluate_fonticulua(body: BodyContext) -> list[RuleEvaluation]:
     ruleset genera through the aggregator would be a no-op, not a bug fix.
     """
     return [evaluate_rule(rule, body) for rule in FONTICULUA_RULES]
+
+
+# Frutexa: the first genus where more than one species has multiple
+# alternative rulesets at once (Metallicum has 4, Sponsae and Collum have
+# 2 each) -- exercises aggregate_species_evaluations() grouping several
+# independent OR-species within a single evaluate_*() call, not just one
+# species in isolation (Cactoida Vermis, Concha Renibus).
+FRUTEXA_RULES: tuple[NormalizedRule, ...] = (
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_01_Name;",
+        species_name="Frutexa Flabellum",
+        value=1808900,
+        atmospheres=frozenset({"Ammonia"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=152.0,
+        max_temperature=177.0,
+        max_pressure=0.0135,
+        body_types=frozenset({"Rocky body"}),
+        regions=("!scutum-centaurus",),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_02_Name;",
+        species_name="Frutexa Acus",
+        value=7774700,
+        atmospheres=frozenset({"CarbonDioxide"}),
+        min_gravity=0.04,
+        max_gravity=0.237,
+        min_temperature=146.0,
+        max_temperature=197.0,
+        min_pressure=0.0029,
+        body_types=frozenset({"Rocky body"}),
+        volcanisms=frozenset({"None"}),
+        regions=("orion-cygnus",),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_03_Name;",
+        species_name="Frutexa Metallicum",
+        value=1632500,
+        atmospheres=frozenset({"Ammonia"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=152.0,
+        max_temperature=176.0,
+        max_pressure=0.01,
+        body_types=frozenset({"High metal content body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_03_Name;",
+        species_name="Frutexa Metallicum",
+        value=1632500,
+        atmospheres=frozenset({"CarbonDioxide"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=146.0,
+        max_temperature=197.0,
+        min_pressure=0.002,
+        body_types=frozenset({"High metal content body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+    # Upstream annotates this ruleset "Only two samples" -- kept as-is
+    # (no pressure/volcanism constraint recorded), not strengthened based
+    # on our own guesswork.
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_03_Name;",
+        species_name="Frutexa Metallicum",
+        value=1632500,
+        atmospheres=frozenset({"Methane"}),
+        min_gravity=0.05,
+        max_gravity=0.1,
+        min_temperature=100.0,
+        max_temperature=300.0,
+        body_types=frozenset({"High metal content body"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_03_Name;",
+        species_name="Frutexa Metallicum",
+        value=1632500,
+        atmospheres=frozenset({"Water"}),
+        min_gravity=0.04,
+        max_gravity=0.07,
+        max_temperature=400.0,
+        max_pressure=0.07,
+        body_types=frozenset({"High metal content body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_04_Name;",
+        species_name="Frutexa Flammasis",
+        value=10326000,
+        atmospheres=frozenset({"Ammonia"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=152.0,
+        max_temperature=177.0,
+        max_pressure=0.0135,
+        body_types=frozenset({"Rocky body"}),
+        regions=("scutum-centaurus",),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_05_Name;",
+        species_name="Frutexa Fera",
+        value=1632500,
+        atmospheres=frozenset({"CarbonDioxide"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=146.0,
+        max_temperature=197.0,
+        min_pressure=0.003,
+        body_types=frozenset({"Rocky body"}),
+        volcanisms=frozenset({"None"}),
+        regions=("outer",),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_06_Name;",
+        species_name="Frutexa Sponsae",
+        value=5988000,
+        atmospheres=frozenset({"Water"}),
+        min_gravity=0.04,
+        max_gravity=0.056,
+        body_types=frozenset({"Rocky body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_06_Name;",
+        species_name="Frutexa Sponsae",
+        value=5988000,
+        atmospheres=frozenset({"Water"}),
+        min_gravity=0.04,
+        max_gravity=0.056,
+        body_types=frozenset({"Rocky body"}),
+        volcanisms=frozenset({"water"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_07_Name;",
+        species_name="Frutexa Collum",
+        value=1639800,
+        atmospheres=frozenset({"SulphurDioxide"}),
+        min_gravity=0.04,
+        max_gravity=0.276,
+        min_temperature=132.0,
+        max_temperature=215.0,
+        max_pressure=0.004,
+        body_types=frozenset({"Rocky body"}),
+    ),
+    NormalizedRule(
+        species_code="$Codex_Ent_Shrubs_07_Name;",
+        species_name="Frutexa Collum",
+        value=1639800,
+        atmospheres=frozenset({"SulphurDioxide"}),
+        min_gravity=0.265,
+        max_gravity=0.276,
+        min_temperature=132.0,
+        max_temperature=135.0,
+        max_pressure=0.004,
+        body_types=frozenset({"High metal content body"}),
+        volcanisms=frozenset({"None"}),
+    ),
+)
+
+
+def evaluate_frutexa(body: BodyContext) -> list[RuleEvaluation]:
+    """Evaluate the seven Frutexa species, OR-collapsing Metallicum's four,
+    Sponsae's two, and Collum's two alternative rulesets via
+    aggregate_species_evaluations() -- three independent OR-species
+    resolved by the same unmodified aggregator in one call.
+    """
+    per_ruleset = [evaluate_rule(rule, body) for rule in FRUTEXA_RULES]
+    return aggregate_species_evaluations(per_ruleset)

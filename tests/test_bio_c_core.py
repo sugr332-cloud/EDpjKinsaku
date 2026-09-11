@@ -4,6 +4,7 @@ from app.bio.c_core import (
     CACTOIDA_RULES,
     CONCHA_RULES,
     FONTICULUA_RULES,
+    FRUTEXA_RULES,
     NormalizedRule,
     RuleEvaluation,
     RuleStatus,
@@ -12,6 +13,7 @@ from app.bio.c_core import (
     evaluate_cactoida,
     evaluate_concha,
     evaluate_fonticulua,
+    evaluate_frutexa,
     evaluate_genus_consistency,
     evaluate_rule,
 )
@@ -503,3 +505,122 @@ def test_fonticulua_has_six_rulesets_across_six_species() -> None:
         atmosphere=None, gravity=None, temperature=None, pressure=None, body_type=None, volcanism=None,
     )
     assert len(evaluate_fonticulua(body)) == 6
+
+
+def test_frutexa_metallicum_matches_via_fourth_of_four_rulesets() -> None:
+    """Metallicum has 4 alternative rulesets. This body fails the first
+    three (wrong atmosphere) but satisfies the fourth (Water)."""
+    body = BodyContext(
+        atmosphere="Water",
+        gravity=0.05,
+        temperature=200.0,
+        pressure=0.03,
+        body_type="High metal content body",
+        volcanism="None",
+    )
+
+    result = evaluate_frutexa(body)[2]
+
+    assert result.species_name == "Frutexa Metallicum"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_frutexa_metallicum_is_no_match_when_all_four_rulesets_reject() -> None:
+    body = BodyContext(
+        atmosphere="Argon",
+        gravity=0.06,
+        temperature=150.0,
+        pressure=0.005,
+        body_type="High metal content body",
+        volcanism="None",
+    )
+
+    result = evaluate_frutexa(body)[2]
+
+    assert result.species_name == "Frutexa Metallicum"
+    assert result.status is RuleStatus.NO_MATCH
+
+
+def test_frutexa_sponsae_matches_via_second_ruleset_when_first_rejects() -> None:
+    body = BodyContext(
+        atmosphere="Water",
+        gravity=0.05,
+        temperature=None,
+        pressure=None,
+        body_type="Rocky body",
+        volcanism="water",
+    )
+
+    result = evaluate_frutexa(body)[5]
+
+    assert result.species_name == "Frutexa Sponsae"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_frutexa_collum_matches_via_second_ruleset_with_different_body_type() -> None:
+    """Collum's first ruleset requires 'Rocky body'; its second requires
+    'High metal content body' with a narrower gravity/temperature band.
+    This body only satisfies the second."""
+    body = BodyContext(
+        atmosphere="SulphurDioxide",
+        gravity=0.27,
+        temperature=133.0,
+        pressure=0.003,
+        body_type="High metal content body",
+        volcanism="None",
+    )
+
+    result = evaluate_frutexa(body)[6]
+
+    assert result.species_name == "Frutexa Collum"
+    assert result.status is RuleStatus.MATCH
+
+
+def test_frutexa_flabellum_and_flammasis_region_conditions_are_inverted() -> None:
+    """Flabellum and Flammasis share identical atmosphere/gravity/
+    temperature/pressure/body_type conditions and differ only in region:
+    Flabellum requires scutum-centaurus to be ABSENT, Flammasis requires
+    it PRESENT (same pair pattern as Aleoida Spica/Laminiae)."""
+
+    def body_with_regions(regions: frozenset[str]) -> BodyContext:
+        return BodyContext(
+            atmosphere="Ammonia",
+            gravity=0.10,
+            temperature=160.0,
+            pressure=0.01,
+            body_type="Rocky body",
+            volcanism=None,
+            regions=regions,
+        )
+
+    in_scutum = evaluate_frutexa(body_with_regions(frozenset({"scutum-centaurus"})))
+    outside_scutum = evaluate_frutexa(body_with_regions(frozenset({"orion-cygnus"})))
+
+    assert in_scutum[0].species_name == "Frutexa Flabellum"
+    assert in_scutum[0].status is RuleStatus.NO_MATCH
+    assert in_scutum[3].species_name == "Frutexa Flammasis"
+    assert in_scutum[3].status is RuleStatus.MATCH
+
+    assert outside_scutum[0].status is RuleStatus.MATCH
+    assert outside_scutum[3].status is RuleStatus.NO_MATCH
+
+
+def test_frutexa_values_match_species_value_master() -> None:
+    from app.bio.species_value_master import SPECIES_VALUE_MASTER
+
+    seen_codes: set[str] = set()
+    for rule in FRUTEXA_RULES:
+        seen_codes.add(rule.species_code)
+        master_entry = SPECIES_VALUE_MASTER[rule.species_code]
+        assert rule.species_name == master_entry.name
+        assert rule.value == master_entry.value
+        assert master_entry.confidence == "confirmed"
+    assert len(seen_codes) == 7
+
+
+def test_frutexa_has_twelve_rulesets_across_seven_species() -> None:
+    assert len(FRUTEXA_RULES) == 12
+    body = BodyContext(
+        atmosphere=None, gravity=None, temperature=None, pressure=None, body_type=None, volcanism=None,
+    )
+    assert len(evaluate_frutexa(body)) == 7
