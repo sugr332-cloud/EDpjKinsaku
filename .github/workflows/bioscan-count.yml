@@ -1,0 +1,21 @@
+name: bioscan-count
+
+on:
+  push:
+    branches: [bio-c-core-validation]
+  workflow_dispatch:
+
+jobs:
+  count-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact BioScan baseline
+        run: |
+          git clone --no-checkout https://github.com/Silarn/EDMC-BioScan.git bioscan
+          git -C bioscan checkout --detach 5f0d2e445a95681bf2e85223f883d5c552a7726b
+      - name: Run deterministic Bacterium and Aleoida count
+        run: |
+          python scripts/count_bioscan_rulesets.py \
+            bioscan/src/bio_scan/bio_data/rulesets/bacterium.py \
+            bioscan/src/bio_scan/bio_data/rulesets/aleoida.py
