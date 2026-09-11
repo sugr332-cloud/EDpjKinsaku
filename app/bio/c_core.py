@@ -10,7 +10,12 @@ Statuses are explicit:
 - NO_MATCH: a supplied predicate is known not to satisfy the rule.
 - INSUFFICIENT_DATA: a required input is missing, so the rule cannot be
   decided without guessing.
-- RULESET_INCONSISTENCY: the normalized rule itself is internally invalid.
+- RULE_DEFINITION_ERROR: the normalized rule itself is internally invalid.
+
+RULESET_INCONSISTENCY is reserved for the genus-level runtime signal raised
+when a genus has been established by upstream evidence but every species rule
+in that genus is rejected. Static rule-definition validation is intentionally
+kept separate from that runtime signal.
 
 Region semantics follow the ruleset representation: positive region names
 must be present, while names prefixed with ``!`` must be absent.
@@ -25,6 +30,7 @@ class RuleStatus(str, Enum):
     MATCH = "MATCH"
     NO_MATCH = "NO_MATCH"
     INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+    RULE_DEFINITION_ERROR = "RULE_DEFINITION_ERROR"
     RULESET_INCONSISTENCY = "RULESET_INCONSISTENCY"
 
 
@@ -71,7 +77,7 @@ def _range_status(
     field_name: str,
 ) -> tuple[RuleStatus, str] | None:
     if minimum is not None and maximum is not None and minimum > maximum:
-        return RuleStatus.RULESET_INCONSISTENCY, f"{field_name}: minimum exceeds maximum"
+        return RuleStatus.RULE_DEFINITION_ERROR, f"{field_name}: minimum exceeds maximum"
     if minimum is not None or maximum is not None:
         if value is None:
             return RuleStatus.INSUFFICIENT_DATA, f"{field_name}: value is missing"
@@ -124,8 +130,8 @@ def evaluate_rule(rule: NormalizedRule, body: BodyContext) -> RuleEvaluation:
                 elif region not in body.regions:
                     checks.append((RuleStatus.NO_MATCH, f"regions: required region {region} is absent"))
 
-    if any(status is RuleStatus.RULESET_INCONSISTENCY for status, _ in checks):
-        status = RuleStatus.RULESET_INCONSISTENCY
+    if any(status is RuleStatus.RULE_DEFINITION_ERROR for status, _ in checks):
+        status = RuleStatus.RULE_DEFINITION_ERROR
     elif any(status is RuleStatus.NO_MATCH for status, _ in checks):
         status = RuleStatus.NO_MATCH
     elif any(status is RuleStatus.INSUFFICIENT_DATA for status, _ in checks):
@@ -135,6 +141,23 @@ def evaluate_rule(rule: NormalizedRule, body: BodyContext) -> RuleEvaluation:
 
     reason = "; ".join(reason for _, reason in checks) if checks else "all predicates satisfied"
     return RuleEvaluation(rule.species_code, rule.species_name, status, reason)
+
+
+def evaluate_genus_consistency(
+    genus_established: bool,
+    evaluations: list[RuleEvaluation],
+) -> RuleStatus | None:
+    """Return the reserved runtime inconsistency signal for an established genus.
+
+    A genus is inconsistent only when upstream evidence establishes the genus
+    and every species rule in that genus is rejected. Missing data or static
+    rule-definition errors are not silently converted into this signal.
+    """
+    if not genus_established or not evaluations:
+        return None
+    if all(result.status is RuleStatus.NO_MATCH for result in evaluations):
+        return RuleStatus.RULESET_INCONSISTENCY
+    return None
 
 
 ALEOIDA_RULES: tuple[NormalizedRule, ...] = (
