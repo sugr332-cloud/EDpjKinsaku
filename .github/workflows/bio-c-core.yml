@@ -1,0 +1,21 @@
+name: bio-c-core
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-and-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install project and test dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Run pytest
+        run: python -m pytest -q
+      - name: Run one live EDSM Aleoida probe
+        run: python scripts/real_edsm_aleoida_probe.py
