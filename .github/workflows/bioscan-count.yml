@@ -14,8 +14,37 @@ jobs:
         run: |
           git clone --no-checkout https://github.com/Silarn/EDMC-BioScan.git bioscan
           git -C bioscan checkout --detach 5f0d2e445a95681bf2e85223f883d5c552a7726b
-      - name: Run deterministic Bacterium and Aleoida count
+      - name: Run deterministic ruleset count (all 19 genus files)
         run: |
           python scripts/count_bioscan_rulesets.py \
+            bioscan/src/bio_scan/bio_data/rulesets/aleoida.py \
+            bioscan/src/bio_scan/bio_data/rulesets/anemone.py \
             bioscan/src/bio_scan/bio_data/rulesets/bacterium.py \
-            bioscan/src/bio_scan/bio_data/rulesets/aleoida.py
+            bioscan/src/bio_scan/bio_data/rulesets/brain_tree.py \
+            bioscan/src/bio_scan/bio_data/rulesets/cactoida.py \
+            bioscan/src/bio_scan/bio_data/rulesets/clypeus.py \
+            bioscan/src/bio_scan/bio_data/rulesets/concha.py \
+            bioscan/src/bio_scan/bio_data/rulesets/electricae.py \
+            bioscan/src/bio_scan/bio_data/rulesets/fonticulua.py \
+            bioscan/src/bio_scan/bio_data/rulesets/frutexa.py \
+            bioscan/src/bio_scan/bio_data/rulesets/fumerola.py \
+            bioscan/src/bio_scan/bio_data/rulesets/fungoida.py \
+            bioscan/src/bio_scan/bio_data/rulesets/osseus.py \
+            bioscan/src/bio_scan/bio_data/rulesets/recepta.py \
+            bioscan/src/bio_scan/bio_data/rulesets/shard.py \
+            bioscan/src/bio_scan/bio_data/rulesets/stratum.py \
+            bioscan/src/bio_scan/bio_data/rulesets/tubers.py \
+            bioscan/src/bio_scan/bio_data/rulesets/tubus.py \
+            bioscan/src/bio_scan/bio_data/rulesets/tussock.py \
+            | tee bioscan_count.log
+      - name: Verify baseline totals (genus_entries=20 species=116 rulesets=254 warnings=0)
+        run: |
+          totals=$(grep '^RESULT' bioscan_count.log \
+            | grep -oE '(genus_entries|species|rulesets|warnings)=[0-9]+' \
+            | awk -F= '{a[$1]+=$2} END {print a["genus_entries"], a["species"], a["rulesets"], a["warnings"]}')
+          read -r genus species rulesets warnings <<< "$totals"
+          echo "totals: genus_entries=$genus species=$species rulesets=$rulesets warnings=$warnings"
+          test "$genus" = "20"
+          test "$species" = "116"
+          test "$rulesets" = "254"
+          test "$warnings" = "0"
