@@ -2,6 +2,7 @@ from app.bio.c_core import (
     ALEOIDA_RULES,
     BodyContext,
     NormalizedRule,
+    RuleEvaluation,
     RuleStatus,
     evaluate_aleoida,
     evaluate_genus_consistency,
