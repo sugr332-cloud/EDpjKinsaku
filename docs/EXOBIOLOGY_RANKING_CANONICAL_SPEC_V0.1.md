@@ -20,8 +20,6 @@ species prediction（`P(species | body_conditions, ...)`）は研究トラック
 
 ## 2. species prediction の昇格基準
 
-species prediction の評価は、以下の3指標を分離して扱う。
-
 ### 2.1 Prediction Accuracy
 
 - Top-1 accuracy
@@ -286,3 +284,129 @@ Collection State
 5. `Variant` の扱い
 
 確認結果と本仕様に差異がある場合は、実ログを一次資料として仕様を更新する。
+
+## 11. 現在航路・目的地までの残りジャンプ数
+
+### 11.1 基本方針
+
+現在の航路情報もJournalを一次入力として取得し、現在地からゲーム内で設定されている目的地までの航路進捗をUIに表示できるものとする。
+
+```text
+Elite Dangerous Journal
+        ↓
+   Route / FSDJump
+        ↓
+Navigation State
+        ↓
+現在地 / 目的地 / 残りジャンプ数
+        ↓
+UI表示
+```
+
+ExobiologyのCollection Stateとは別責務とし、Navigation Stateとして管理する。
+
+### 11.2 残りジャンプ数
+
+Journalの航路関連イベントから、ゲーム内で設定された航路の残りジャンプ数を取得できる場合は、その値を正本として利用する。
+
+特に `FSDTarget` に記録される `RemainingJumpsInRoute` を優先的な入力候補とする。
+
+UIでは例えば以下のように表示する。
+
+```text
+🎯 目的地
+Sol
+
+🚀 残り 17 ジャンプ
+```
+
+ジャンプ完了時に `FSDJump` 等のイベントを処理し、現在星系と航路進捗を更新する。
+
+### 11.3 目的地・クエストとの関係
+
+「現在設定されている航路の目的地」と「現在受注しているクエストの目的地」は別概念として扱う。
+
+```text
+Navigation Target
+  └─ ゲーム内で設定された航路目的地
+
+Mission Target
+  └─ 受注中ミッションが要求する目的地
+```
+
+UI上では両者を混同しない。
+
+例:
+
+```text
+🎯 航路目的地: Sol
+🚀 残り: 17 jumps
+
+📋 クエスト目的地: Col 285 Sector ...
+```
+
+### 11.4 クエスト目的地からの残りジャンプ数
+
+受注中ミッションの目的地をJournalから正確に復元できることを確認できた場合、現在地から当該目的地までの残りジャンプ数を算出・表示できるものとする。
+
+ただし、これはゲーム内航路の `RemainingJumpsInRoute` と同一視しない。
+
+- ゲーム内航路が設定されている場合: ゲーム側の残りジャンプ数を優先表示する
+- ミッション目的地は存在するがゲーム内航路が設定されていない場合: 別途ルート計算が必要
+- ミッション目的地をJournalから確定できない場合: 残りジャンプ数を推測表示しない
+
+### 11.5 Navigation State の最低限のデータ
+
+```text
+current_system
+current_body
+navigation_target
+remaining_jumps_in_route
+route_source
+mission_target
+mission_target_source
+```
+
+`route_source` / `mission_target_source` を保持し、ゲームJournal由来の値とアプリ側計算値を区別できるようにする。
+
+### 11.6 UI表示方針
+
+Exobiology候補一覧と同時に、現在の移動状況を常時確認できる構成を想定する。
+
+```text
+┌──────────────────────────────┐
+│ 🚀 Navigation                │
+│ 現在: HIP 12345              │
+│ 目的地: Sol                  │
+│ 残り: 17 jumps               │
+├──────────────────────────────┤
+│ 🧬 Exobiology                │
+│ Aleoida Arcus       12.9M    │
+│ 判定: MATCH      採集: 2/3  │
+└──────────────────────────────┘
+```
+
+### 11.7 既存英語ツールとの関係
+
+残りジャンプ数・航路進捗の表示自体は既存のElite Dangerous向けコンパニオンツールでも実績のある機能である。
+
+本プロジェクトでは既存ツールと同じ機能を単独で再発明することを目的とせず、ExobiologyのC-CORE判定・採集状態と同じUI上で利用できることを目的とする。
+
+### 11.8 実装前の確認事項
+
+Mission Targetまでの残りジャンプ数については、実装前に実ゲームJournalを用いて以下を確認する。
+
+1. 受注・更新・完了・失敗時のMission関連イベント
+2. Mission目的地をJournalから一意に復元できるフィールド
+3. ミッション種別ごとの目的地表現の差異
+4. ゲーム内航路設定時の `FSDTarget` / `RemainingJumpsInRoute` の実際の記録
+5. `FSDJump` 後の航路進捗更新
+6. ゲーム内航路未設定時にアプリ側ルート計算を行う必要性
+
+実ゲームログと既存資料に差異がある場合は、実ログを一次資料として仕様を更新する。
+
+### 11.9 現時点の実装範囲
+
+本節は仕様定義であり、Navigation State、Mission Target parser、残りジャンプ数表示、アプリ側ルート計算が実装済みであることを意味しない。
+
+特に「クエスト目的地まであと何ジャンプ」は、Journalから目的地を確定できることと、ルート計算方法を確認した後に実装対象とする。
