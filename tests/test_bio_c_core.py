@@ -1,3 +1,5 @@
+import pytest
+
 from app.bio.c_core import (
     ALEOIDA_RULES,
     BodyContext,
@@ -16,6 +18,7 @@ from app.bio.c_core import (
     evaluate_fonticulua,
     evaluate_frutexa,
     evaluate_fumerola,
+    evaluate_genus,
     evaluate_genus_consistency,
     evaluate_rule,
 )
@@ -752,3 +755,31 @@ def test_fumerola_has_twenty_seven_rulesets_across_four_species() -> None:
         atmosphere=None, gravity=None, temperature=None, pressure=None, body_type=None, volcanism=None,
     )
     assert len(evaluate_fumerola(body)) == 4
+
+
+def test_evaluate_genus_dispatches_by_name() -> None:
+    body = BodyContext(
+        atmosphere="CarbonDioxide",
+        gravity=0.04,
+        temperature=180.0,
+        pressure=0.0161,
+        body_type="Rocky body",
+        volcanism="None",
+    )
+    assert evaluate_genus("Aleoida", body) == evaluate_aleoida(body)
+
+
+def test_evaluate_genus_is_case_insensitive() -> None:
+    body = BodyContext(
+        atmosphere=None, gravity=None, temperature=None, pressure=None, body_type=None, volcanism=None,
+    )
+    assert evaluate_genus("FUMEROLA", body) == evaluate_genus("fumerola", body) == evaluate_fumerola(body)
+
+
+def test_evaluate_genus_raises_key_error_for_an_unconverted_genus() -> None:
+    """13 of 19 genera have no evaluator yet; asking for one must not silently return no candidates."""
+    body = BodyContext(
+        atmosphere=None, gravity=None, temperature=None, pressure=None, body_type=None, volcanism=None,
+    )
+    with pytest.raises(KeyError, match="(?i)tussock"):
+        evaluate_genus("Tussock", body)

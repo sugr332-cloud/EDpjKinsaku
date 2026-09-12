@@ -31,6 +31,7 @@ one verdict per species_code.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
@@ -1111,3 +1112,31 @@ def evaluate_fumerola(body: BodyContext) -> list[RuleEvaluation]:
     """
     per_ruleset = [evaluate_rule(rule, body) for rule in FUMEROLA_RULES]
     return aggregate_species_evaluations(per_ruleset)
+
+
+_GENUS_EVALUATORS: dict[str, Callable[[BodyContext], list[RuleEvaluation]]] = {
+    "aleoida": evaluate_aleoida,
+    "cactoida": evaluate_cactoida,
+    "concha": evaluate_concha,
+    "fonticulua": evaluate_fonticulua,
+    "frutexa": evaluate_frutexa,
+    "fumerola": evaluate_fumerola,
+}
+
+
+def evaluate_genus(genus: str, body: BodyContext) -> list[RuleEvaluation]:
+    """Dispatches to the per-genus evaluator by name (case-insensitive), for callers - such as an
+    external CLI boundary - that only have a genus name at hand rather than an imported function
+    reference.
+
+    Raises KeyError, not a silent empty list, for a genus not yet converted: the caller asked for a
+    verdict this module cannot give, which is a different situation from a body it evaluated and
+    found had no candidates.
+    """
+    try:
+        evaluator = _GENUS_EVALUATORS[genus.lower()]
+    except KeyError:
+        raise KeyError(
+            f"no C-CORE evaluator for genus {genus!r} (converted so far: {sorted(_GENUS_EVALUATORS)})"
+        ) from None
+    return evaluator(body)
