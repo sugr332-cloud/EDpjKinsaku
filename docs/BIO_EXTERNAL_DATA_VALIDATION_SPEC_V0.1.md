@@ -115,25 +115,41 @@ system + body + genus + species + variant + observed_at + source
 P(species | body_conditions, signals, region, known_observations, ...)
 ```
 
-ここがBio Value Model V1の主要な不確実性である。
+**訂正（2026-09-13、`docs/EXOBIOLOGY_RANKING_CANONICAL_SPEC_V0.1.md`との用語統一）**: 本節はかつてここを「Bio Value Model V1の主要な不確実性」と呼んでいたが、これは誤りだった。正本（`docs/EXOBIOLOGY_RANKING_CANONICAL_SPEC_V0.1.md` §1）が定義する**V1は`signal_count × user-calibrated expected value per signal`であり、species predictionを一切含まない**（`docs/PHASE_3_BIO_VALUE_MODEL_V1_DESIGN_BASELINE_V0.1.md` §0）。本節が扱う不確実性は、species predictionを用いた**研究/候補モデル**（同canonical spec §2/§3の昇格判定対象であり、まだ本番V1ではない）のものである。
 
 **固定種価値の誤差とspecies predictionの誤差を混同してはならない。**
 
-## 5. 正式な期待値式
+## 5. species prediction由来の期待値式（研究/候補モデル）
 
-既存仕様のsource-of-truthを維持する。
+**訂正（2026-09-13）**: 本節の式はかつて「既存仕様のsource-of-truth」と呼ばれていたが、これは現行V1（`signal_count × user-calibrated expected value per signal`、正本は`docs/EXOBIOLOGY_RANKING_CANONICAL_SPEC_V0.1.md` §1）の説明ではない。以下はspecies predictionを入力とする**研究/候補モデル**の式であり、本番採用の可否は同canonical spec §2の昇格基準（Prediction Accuracy / Value Error / Ranking Quality の全条件）を満たすまで未確定である。
 
 ```text
-expected_value_base = Σ p(s) × base_value(s)
+expected_value_base（species prediction由来、研究/候補モデル） = Σ p(s) × base_value(s)
 ```
 
-First Discovery等の倍率を考慮した参考値は別系統で保持する。
+First Discovery等の倍率を考慮した参考値も同じ研究/候補モデル系統として保持する。
 
 ```text
-expected_value_best = Σ p(s) × base_value(s) × fd_multiplier
+expected_value_best（研究/候補モデル） = Σ p(s) × base_value(s) × fd_multiplier
 ```
 
 `p(s)` の正しさは外部観測で検証する。`base_value(s)` の正しさは複数の独立ソースで照合し、可能なら実際の`SellOrganicData`でspot-checkする。
+
+### 5.x 現行V1（signal-count formula）の状態
+
+```text
+V1: signal_count × user-calibrated expected value per signal
+    （設計: docs/PHASE_3_BIO_VALUE_MODEL_V1_DESIGN_BASELINE_V0.1.md、
+      正本: docs/EXOBIOLOGY_RANKING_CANONICAL_SPEC_V0.1.md §1）
+
+Formula Validation Gate:  SPECIFIED / NOT_IMPLEMENTED
+Historical Replay:        NOT_IMPLEMENTED
+Validation result:        NONE
+Holdout result:           NONE
+Production adoption:      NOT VALIDATED
+```
+
+既存の61.4% PASS（`docs/BIO_VALUE_FORMULA_BACKTEST_RESULT_V0.1.md`）は上記の研究/候補モデル（species prediction由来のvalue formula）に対する結果であり、**V1のFormula Validation Gate結果として扱ってはならない**。この記録自体は削除・変更しない（species prediction/value modelの歴史記録として維持する）。
 
 ## 6. 検証方法
 
@@ -233,3 +249,4 @@ Bio関連の実装・分析を開始する前に、**必ず最新のEDpj仕様�
 ## 12. Change history
 
 - 2026-09-05: v0.1 — Bio external/global data validation, 60% accuracy gate, source reliability hierarchy, personal-data separationを正式化。
+- 2026-09-13: §4.3/§5の「Bio Value Model V1」「既存仕様のsource-of-truth」という呼称を是正。本書執筆時点（09-05）ではV1の実体が未確定だったため、当時想定していたspecies prediction由来の式（`Σp(s)×base_value(s)`）を「V1」と呼んでいたが、翌日確定した実際のV1（`docs/PHASE_3_BIO_VALUE_MODEL_V1_DESIGN_BASELINE_V0.1.md`、signal_count版）および正本`docs/EXOBIOLOGY_RANKING_CANONICAL_SPEC_V0.1.md`（2026-09-11）とは別物である。用語を正本に合わせ、species prediction由来の式は「研究/候補モデル」として明示。現行V1のFormula Validation Gate状態（SPECIFIED/NOT_IMPLEMENTED）を追記。既存の61.4% PASS記録（`docs/BIO_VALUE_FORMULA_BACKTEST_RESULT_V0.1.md`）は削除・変更していない。
