@@ -8,6 +8,7 @@ import typer
 
 from app.cli.api import api_app
 from app.cli.backfill import journal_app
+from app.cli.bio import bio_app
 from app.cli.calibration import calibration_app
 from app.cli.collector import collector_app
 from app.cli.state import state_app
@@ -18,6 +19,7 @@ app.add_typer(state_app, name="state")
 app.add_typer(collector_app, name="collector")
 app.add_typer(api_app, name="api")
 app.add_typer(calibration_app, name="calibration")
+app.add_typer(bio_app, name="bio")
 
 
 if __name__ == "__main__":

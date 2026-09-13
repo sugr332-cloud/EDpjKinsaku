@@ -20,8 +20,6 @@ species prediction（`P(species | body_conditions, ...)`）は研究トラック
 
 ## 2. species prediction の昇格基準
 
-species prediction の評価は、以下の3指標を分離して扱う。
-
 ### 2.1 Prediction Accuracy
 
 - Top-1 accuracy
@@ -121,3 +119,294 @@ Mining / Trade / Market の旧仕様を現在のランキング設計の依存�
 4. Backtest / Investigation / Implementation Note
 
 Phase文書や実装ノートに本書と異なる暫定式・旧方針が残っている場合、それは履歴または実装記録として扱い、本番仕様の正本とはしない。
+
+## 10. Journal による Exobiology 採集状態の取得
+
+### 10.1 基本方針
+
+Exobiologyの「採集状況」は、Cargo容量・Cargo内容量から推定しない。
+
+ゲーム内Journalに記録される `ScanOrganic` イベントを一次入力とし、アプリケーション側で対象Speciesの採集状態を管理する。
+
+```text
+Elite Dangerous Journal
+        ↓
+    ScanOrganic
+        ↓
+Collection State
+        ↓
+現在の System / Body / Species
+        ↓
+UI表示
+```
+
+C-COREのSpecies判定と採集状態は別の責務として扱う。
+
+- **C-CORE:** この天体で成立する可能性のあるSpeciesを判定する
+- **Collection State:** プレイヤーがそのSpeciesをどこまで採集・分析したかを管理する
+
+### 10.2 ScanOrganic
+
+`ScanOrganic` はOrganic Sampling Toolによる生物スキャンをJournalへ記録するイベントとして扱う。
+
+主な入力項目として以下を利用する。
+
+- `ScanType`
+- `Genus`
+- `Genus_Localised`
+- `Species`
+- `Species_Localised`
+- `Variant`
+- `Variant_Localised`
+- `SystemAddress`
+- `Body`
+- `timestamp`
+
+`ScanOrganic` の `ScanType` は、少なくとも `Log` / `Sample` / `Analyse` を区別できるものとして扱う。
+
+### 10.3 採集状態モデル
+
+Journalにはアプリケーション向けの `2/3` 等の完成済みカウンタが直接記録されるとは限らないため、Journalイベントからアプリケーション側で状態を再構成する。
+
+基本状態は以下とする。
+
+```text
+UNKNOWN
+LOGGED
+SAMPLING
+ANALYSED
+```
+
+`SAMPLING` の内部状態では、取得済みSample数を別フィールドとして保持する。
+
+```text
+sample_count = 0
+sample_count = 1
+sample_count = 2
+sample_count = 3
+```
+
+UI上では必要に応じて以下のように表示する。
+
+```text
+採集状況 0/3
+採集状況 1/3
+採集状況 2/3
+採集状況 3/3
+```
+
+ただし、`3/3` を単純に3件のJournalイベント数だけで確定しない。`ScanType=Analyse` を含む実際のイベント系列を基準として完了状態を確定する。
+
+### 10.4 状態の識別単位
+
+採集状態は最低限、以下の組み合わせで対象を識別する。
+
+```text
+SystemAddress + Body + Species
+```
+
+必要に応じて `Variant` を保持するが、Variantの違いだけでSpeciesの採集状態を別Speciesとして扱わない。
+
+### 10.5 重複イベント
+
+Journal再読込・アプリ再起動・同一イベントの再処理によって採集数を二重計上してはならない。
+
+イベントには `timestamp` 等を利用した重複排除キーを設け、同一Journalイベントを複数回適用してもCollection Stateが変化しない冪等な処理とする。
+
+### 10.6 星系・天体との紐付け
+
+採集状態はSpecies名だけで保持せず、必ず対象天体に紐付ける。
+
+```text
+SystemAddress
+  └─ Body
+      └─ Species
+          └─ Collection State
+```
+
+これにより、別の星系・別の天体に同一Speciesが存在しても採集済み状態を混同しない。
+
+### 10.7 Journal再生と永続化
+
+アプリ起動時に既存Journalを再生して現在のCollection Stateを復元できる設計とする。
+
+実装時は、以下を満たすことを要求する。
+
+- 最新Journalを監視できる
+- 過去Journalをreplayできる
+- 同一イベントの再処理が冪等である
+- アプリ再起動後も必要な状態を復元できる
+- 星系・天体移動後に前天体の採集状態と混同しない
+
+### 10.8 UI表示
+
+採集状況はC-COREの判定結果と同じカード内に表示できるが、意味を混同させない。
+
+```text
+🧬 Aleoida Arcus
+
+判定: MATCH
+価値: 12.9M
+
+採集状況
+██████░░░░ 2/3
+✓ Sample
+✓ Sample
+○ Sample
+```
+
+候補Speciesについて、C-COREが `MATCH` でも採集状況が `0/3` なら未採集として表示する。逆に採集済みでも、現在天体に対するC-CORE判定が成立しない場合は、過去の採集記録として扱い、現在の候補とは混同しない。
+
+### 10.9 Cargoとの責務分離
+
+Cargo表示とExobiology採集状態は別モデルとする。
+
+```text
+Cargo State
+  └─ Cargo容量 / 現在搭載量
+
+Collection State
+  └─ System / Body / Species / Sample / Analyse
+```
+
+「Cargoに入っているから採集済み」と推定する仕様は採用しない。
+
+### 10.10 現時点の実装範囲
+
+本節は仕様定義であり、`ScanOrganic` のJournal parserおよびCollection State実装が完了したことを意味しない。
+
+実装前に実ゲームのJournalログを用いて以下を確認する。
+
+1. 実際の`ScanOrganic`イベント系列
+2. `Log` / `Sample` / `Analyse` の遷移
+3. 同一Species・同一Bodyでの再処理時の挙動
+4. 中断・失敗・再開時のイベント系列
+5. `Variant` の扱い
+
+確認結果と本仕様に差異がある場合は、実ログを一次資料として仕様を更新する。
+
+## 11. 現在航路・目的地までの残りジャンプ数
+
+### 11.1 基本方針
+
+現在の航路情報もJournalを一次入力として取得し、現在地からゲーム内で設定されている目的地までの航路進捗をUIに表示できるものとする。
+
+```text
+Elite Dangerous Journal
+        ↓
+   Route / FSDJump
+        ↓
+Navigation State
+        ↓
+現在地 / 目的地 / 残りジャンプ数
+        ↓
+UI表示
+```
+
+ExobiologyのCollection Stateとは別責務とし、Navigation Stateとして管理する。
+
+### 11.2 残りジャンプ数
+
+Journalの航路関連イベントから、ゲーム内で設定された航路の残りジャンプ数を取得できる場合は、その値を正本として利用する。
+
+特に `FSDTarget` に記録される `RemainingJumpsInRoute` を優先的な入力候補とする。
+
+UIでは例えば以下のように表示する。
+
+```text
+🎯 目的地
+Sol
+
+🚀 残り 17 ジャンプ
+```
+
+ジャンプ完了時に `FSDJump` 等のイベントを処理し、現在星系と航路進捗を更新する。
+
+### 11.3 目的地・クエストとの関係
+
+「現在設定されている航路の目的地」と「現在受注しているクエストの目的地」は別概念として扱う。
+
+```text
+Navigation Target
+  └─ ゲーム内で設定された航路目的地
+
+Mission Target
+  └─ 受注中ミッションが要求する目的地
+```
+
+UI上では両者を混同しない。
+
+例:
+
+```text
+🎯 航路目的地: Sol
+🚀 残り: 17 jumps
+
+📋 クエスト目的地: Col 285 Sector ...
+```
+
+### 11.4 クエスト目的地からの残りジャンプ数
+
+受注中ミッションの目的地をJournalから正確に復元できることを確認できた場合、現在地から当該目的地までの残りジャンプ数を算出・表示できるものとする。
+
+ただし、これはゲーム内航路の `RemainingJumpsInRoute` と同一視しない。
+
+- ゲーム内航路が設定されている場合: ゲーム側の残りジャンプ数を優先表示する
+- ミッション目的地は存在するがゲーム内航路が設定されていない場合: 別途ルート計算が必要
+- ミッション目的地をJournalから確定できない場合: 残りジャンプ数を推測表示しない
+
+### 11.5 Navigation State の最低限のデータ
+
+```text
+current_system
+current_body
+navigation_target
+remaining_jumps_in_route
+route_source
+mission_target
+mission_target_source
+```
+
+`route_source` / `mission_target_source` を保持し、ゲームJournal由来の値とアプリ側計算値を区別できるようにする。
+
+### 11.6 UI表示方針
+
+Exobiology候補一覧と同時に、現在の移動状況を常時確認できる構成を想定する。
+
+```text
+┌──────────────────────────────┐
+│ 🚀 Navigation                │
+│ 現在: HIP 12345              │
+│ 目的地: Sol                  │
+│ 残り: 17 jumps               │
+├──────────────────────────────┤
+│ 🧬 Exobiology                │
+│ Aleoida Arcus       12.9M    │
+│ 判定: MATCH      採集: 2/3  │
+└──────────────────────────────┘
+```
+
+### 11.7 既存英語ツールとの関係
+
+残りジャンプ数・航路進捗の表示自体は既存のElite Dangerous向けコンパニオンツールでも実績のある機能である。
+
+本プロジェクトでは既存ツールと同じ機能を単独で再発明することを目的とせず、ExobiologyのC-CORE判定・採集状態と同じUI上で利用できることを目的とする。
+
+### 11.8 実装前の確認事項
+
+Mission Targetまでの残りジャンプ数については、実装前に実ゲームJournalを用いて以下を確認する。
+
+1. 受注・更新・完了・失敗時のMission関連イベント
+2. Mission目的地をJournalから一意に復元できるフィールド
+3. ミッション種別ごとの目的地表現の差異
+4. ゲーム内航路設定時の `FSDTarget` / `RemainingJumpsInRoute` の実際の記録
+5. `FSDJump` 後の航路進捗更新
+6. ゲーム内航路未設定時にアプリ側ルート計算を行う必要性
+
+実ゲームログと既存資料に差異がある場合は、実ログを一次資料として仕様を更新する。
+
+### 11.9 現時点の実装範囲
+
+本節は仕様定義であり、Navigation State、Mission Target parser、残りジャンプ数表示、アプリ側ルート計算が実装済みであることを意味しない。
+
+特に「クエスト目的地まであと何ジャンプ」は、Journalから目的地を確定できることと、ルート計算方法を確認した後に実装対象とする。
