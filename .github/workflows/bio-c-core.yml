@@ -1,23 +1,23 @@
 name: bio-c-core
 
+# Live-network probe only, deliberately kept off pull_request/push(main): it depends on the real
+# EDSM API, so a rate limit or outage there must never block a PR or turn main red. Deterministic
+# checks (pytest, consistency, dangling references) run in checks.yml instead - see
+# docs/PHASE_F_IMPLEMENTATION_DOC_CONSISTENCY_SPEC_V0.1.md section 6.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"
   workflow_dispatch:
 
 jobs:
-  test-and-probe:
+  probe:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install project and test dependencies
+      - name: Install project dependencies
         run: python -m pip install -e '.[dev]'
-      - name: Run pytest
-        run: python -m pytest -q
       - name: Run one live EDSM Aleoida probe
         run: python scripts/real_edsm_aleoida_probe.py
