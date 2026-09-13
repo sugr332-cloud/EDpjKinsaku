@@ -225,8 +225,8 @@ EliteIntel 側には genus / species ごとの判定ロジックを追加しな�
 
 現在の C-CORE baseline:
 
-- 20 genus entries
-- 116 species
+- 19 genus entries
+- 115 species
 - 254 rulesets
 - warnings 0
 
@@ -374,7 +374,7 @@ VOICEVOXおよび各音声ライブラリは無料で利用できるが、音声
 ### EDpjKinsaku
 
 - `pytest -q`
-- BioScan baseline: `20 / 116 / 254 / 0`
+- BioScan baseline: `19 / 115 / 254 / 0`
 - C-CORE fixture tests
 - fixed BodyContext integration tests
 
