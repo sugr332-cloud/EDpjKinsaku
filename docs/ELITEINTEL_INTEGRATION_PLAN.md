@@ -42,6 +42,22 @@ EliteIntel HUD
 - 既存コードを変更せず baseline を確定する。
 - EDpjKinsaku C-CORE は既存の baseline `116 species / 254 rulesets / warnings 0` を維持する。
 
+BLOCK 1（`docs/PHASE_F_IMPLEMENTATION_DOC_CONSISTENCY_SPEC_V0.1.md` §2/§8）: このセクションが `scripts/check_consistency.py`（F-1）の比較対象となる baseline ブロックを持つ最初の文書。`implemented_*` と `cli_commands` のみが実測値と比較され、`target_*` は比較対象外（同spec §2 ルール3）。
+
+<!-- baseline:begin -->
+```yaml
+c_core:
+  implemented_genera: 6
+  implemented_rulesets: 65
+  target_genera: 19
+  target_rulesets: 254
+species_value_master:
+  implemented_entries: 114
+  target_entries: provisional
+cli_commands: [journal, state, collector, api, calibration, bio]
+```
+<!-- baseline:end -->
+
 完了条件:
 
 - EliteIntel の既存 build / test が成功
