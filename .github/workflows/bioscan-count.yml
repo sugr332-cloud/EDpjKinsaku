@@ -37,14 +37,29 @@ jobs:
             bioscan/src/bio_scan/bio_data/rulesets/tubus.py \
             bioscan/src/bio_scan/bio_data/rulesets/tussock.py \
             | tee bioscan_count.log
-      - name: Verify baseline totals (genus_entries=20 species=116 rulesets=254 warnings=0)
+      - name: Verify baseline totals (genus_entries=19 species=115 rulesets=254 warnings=0)
         run: |
+          # scripts/count_bioscan_rulesets.py counts stratum.py's catalog as 2 genus_entries / 9
+          # species, not 1/8: its catalog carries one orphan top-level entry
+          # ($Codex_Ent_Stratum_04_Name;, "Stratum Aranaemus", 0 rulesets) duplicating the real,
+          # correctly-nested species of the same code ("Stratum Araneamus", 1 ruleset). Confirmed
+          # against upstream's own pinned source as a typo/corrupt duplicate, not a 20th genus or
+          # species (docs/BIOSCAN_UPSTREAM_DISCREPANCIES.md, BUD-002, CONFIRMED_TYPO) - canonical is
+          # 19 genus_entries / 115 species. rulesets is unaffected because the orphan's own ruleset
+          # count is 0. The counter script itself is intentionally not changed here (it is a faithful
+          # raw reader of upstream's literal catalog structure); the one known duplicate is
+          # compensated for here instead, where the discrepancy is already documented.
+          bud_002_orphan_genus_entries=1
+          bud_002_orphan_species=1
           totals=$(grep '^RESULT' bioscan_count.log \
             | grep -oE '(genus_entries|species|rulesets|warnings)=[0-9]+' \
             | awk -F= '{a[$1]+=$2} END {print a["genus_entries"], a["species"], a["rulesets"], a["warnings"]}')
-          read -r genus species rulesets warnings <<< "$totals"
-          echo "totals: genus_entries=$genus species=$species rulesets=$rulesets warnings=$warnings"
-          test "$genus" = "20"
-          test "$species" = "116"
+          read -r raw_genus raw_species rulesets warnings <<< "$totals"
+          genus=$((raw_genus - bud_002_orphan_genus_entries))
+          species=$((raw_species - bud_002_orphan_species))
+          echo "raw totals: genus_entries=$raw_genus species=$raw_species rulesets=$rulesets warnings=$warnings"
+          echo "canonical (BUD-002 orphan excluded): genus_entries=$genus species=$species rulesets=$rulesets warnings=$warnings"
+          test "$genus" = "19"
+          test "$species" = "115"
           test "$rulesets" = "254"
           test "$warnings" = "0"
