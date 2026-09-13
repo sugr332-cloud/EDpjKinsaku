@@ -8,24 +8,33 @@
 # that used to implement it. Per spec section 8, BLOCK 6 ("消失した規範文書の回収") is what
 # resolves this category - by then either recovering the document or removing the reference -
 # and empties this file.
+#
+# 2026-09-13: BLOCK 6's first pass recovered the Bio-relevant content of 9 of these documents
+# into docs/BIO_STATE_CANDIDATE_FOUNDATION_V0.1.md and docs/SHARED_SCORING_FOUNDATION_V0.1.md
+# (see each new document's own §0 Provenance table for exact source/section/commit). Those 9
+# entries are annotated below but NOT removed yet: the actual dangling references come from
+# app/**'s docstrings/comments citing the old filenames directly, and app/** is out of scope for
+# this pass. Removing these lines now would make check_dangling_refs.py fail again on the very
+# next run. Entries without a "recovered in" annotation are either Mining/Trade/Market-scoped
+# (out of current Bio/C-CORE scope, not recovered) or not yet investigated.
 
 ABSOLUTE_FORMULA_VALIDATION_GATE_V0.1.md  # BLOCK 6: deleted normative document recovery
 CLAUDE_FORMULA_VALIDATION_DIRECTIVE_V0.1.md  # BLOCK 6: deleted normative document recovery
-IMPLEMENTATION_SPEC_V0.2.md  # BLOCK 6: deleted normative document recovery
-PHASE_2_2_CANDIDATE_GENERATION_DESIGN_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
+IMPLEMENTATION_SPEC_V0.2.md  # BLOCK 6: Bio-relevant content recovered in docs/BIO_STATE_CANDIDATE_FOUNDATION_V0.1.md; app/** reference update still pending
+PHASE_2_2_CANDIDATE_GENERATION_DESIGN_BASELINE_V0.1.md  # BLOCK 6: Bio-relevant content recovered in docs/BIO_STATE_CANDIDATE_FOUNDATION_V0.1.md; app/** reference update still pending
 PHASE_2_3_HORIZON_VALUE_DESIGN_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
 SPECIFICATION_TRADE_SCOPE_AMENDMENT_V0.1.md  # BLOCK 6: deleted normative document recovery
-SPECIFICATION_V0.4.md  # BLOCK 6: deleted normative document recovery
+SPECIFICATION_V0.4.md  # BLOCK 6: Bio-relevant content recovered in docs/BIO_STATE_CANDIDATE_FOUNDATION_V0.1.md; app/** reference update still pending
 docs/ABSOLUTE_FORMULA_VALIDATION_GATE_V0.1.md  # BLOCK 6: deleted normative document recovery
 docs/CLAUDE_FORMULA_VALIDATION_DIRECTIVE_V0.1.md  # BLOCK 6: deleted normative document recovery
 docs/MARKET_PREDICTABILITY_SPEC_V0.1.md  # BLOCK 6: deleted normative document recovery
-docs/PHASE_2_0_DESIGN_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
-docs/PHASE_2_2_CANDIDATE_GENERATION_DESIGN_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
+docs/PHASE_2_0_DESIGN_BASELINE_V0.1.md  # BLOCK 6: Bio-relevant content recovered in docs/SHARED_SCORING_FOUNDATION_V0.1.md; app/** reference update still pending
+docs/PHASE_2_2_CANDIDATE_GENERATION_DESIGN_BASELINE_V0.1.md  # BLOCK 6: Bio-relevant content recovered in docs/BIO_STATE_CANDIDATE_FOUNDATION_V0.1.md; app/** reference update still pending
 docs/PHASE_2_3_HORIZON_VALUE_DESIGN_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
-docs/PHASE_2_4_RANKING_DESIGN_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
+docs/PHASE_2_4_RANKING_DESIGN_BASELINE_V0.1.md  # BLOCK 6: Bio-relevant content recovered in docs/SHARED_SCORING_FOUNDATION_V0.1.md; app/** reference update still pending
 docs/PHASE_2_5A_MARKET_PREDICTABILITY_IMPLEMENTATION_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
-docs/PHASE_2_5D_EXPLAINABILITY_DESIGN_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
-docs/PHASE_2_5_CONFIDENCE_EXPLAINABILITY_DESIGN_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
+docs/PHASE_2_5D_EXPLAINABILITY_DESIGN_BASELINE_V0.1.md  # BLOCK 6: Bio-relevant content recovered in docs/SHARED_SCORING_FOUNDATION_V0.1.md; app/** reference update still pending
+docs/PHASE_2_5_CONFIDENCE_EXPLAINABILITY_DESIGN_BASELINE_V0.1.md  # BLOCK 6: Bio-relevant content recovered in docs/SHARED_SCORING_FOUNDATION_V0.1.md; app/** reference update still pending
 docs/PHASE_2_6A_HISTORICAL_REPLAY_IMPLEMENTATION_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
 docs/PHASE_2_6B_VOLATILITY_EVALUATION_IMPLEMENTATION_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
 docs/PHASE_2_6C_FRESHNESS_EVALUATION_IMPLEMENTATION_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
@@ -38,6 +47,6 @@ docs/PHASE_2_6F_T3_..._DESIGN_BASELINE_V0.1.md  # BLOCK 6: deleted normative doc
 docs/PHASE_2_6_HISTORICAL_BACKTEST_DESIGN_BASELINE_V0.1.md  # BLOCK 6: deleted normative document recovery
 docs/PHASE_TRADE_MARKET_PERSISTENCE_V0.1.md  # BLOCK 6: deleted normative document recovery
 docs/PHASE_TRADE_T4_EDDN_COMMODITY_INITIAL_AUDIT_V0.1.md  # BLOCK 6: deleted normative document recovery
-docs/RECOMMENDATION_EXPLAINABILITY_SPEC_V0.1.md  # BLOCK 6: deleted normative document recovery
+docs/RECOMMENDATION_EXPLAINABILITY_SPEC_V0.1.md  # BLOCK 6: Bio-relevant content recovered in docs/SHARED_SCORING_FOUNDATION_V0.1.md; app/** reference update still pending
 docs/SPECIFICATION_TRADE_MARKET_PERSISTENCE_AMENDMENT_V0.1.md  # BLOCK 6: deleted normative document recovery
 docs/SPECIFICATION_TRADE_SCOPE_AMENDMENT_V0.1.md  # BLOCK 6: deleted normative document recovery
