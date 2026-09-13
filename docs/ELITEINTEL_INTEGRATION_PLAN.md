@@ -53,7 +53,7 @@ c_core:
   target_rulesets: 254
 species_value_master:
   implemented_entries: 114
-  target_entries: provisional
+  target_entries: 115
 cli_commands: [journal, state, collector, api, calibration, bio]
 ```
 <!-- baseline:end -->
