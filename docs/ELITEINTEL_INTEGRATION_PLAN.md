@@ -1,421 +1,558 @@
-# EliteIntel × EDpjKinsaku C-CORE Integration Plan
+# EDpjKinsaku / EliteIntel 実装ロードマップ
 
 ## 目的
 
-EliteIntel を Elite Dangerous 側の Journal / Session / HUD / Navigation のホストとして利用し、EDpjKinsaku の Exobiology C-CORE を候補種判定エンジンとして接続する。
+本プロジェクトの優先順位を見直す。
 
-116 species の判定ロジックを EliteIntel 側へ移植せず、EDpjKinsaku C-CORE を Exobiology 判定の Source of Truth とする。
+最優先は、既存 EliteIntel が現在提供している機能を実装対象として整理し、**ユーザー向け表示・操作・仕様を日本語へ置き換えること**である。
 
-## アーキテクチャ
+その次に、AI/LLM 部分を API 前提にせず **CLI Provider として差し替え可能にし、Antigravity CLI (`agy`) を利用できるようにする**。
+
+Exobiology C-CORE は重要だが、既存 UI/操作体験の日本語化・機能置換を阻害しない。C-CORE の追加統合・拡張は後段へ回す。
+
+## 優先順位
+
+1. **既存機能の日本語化・現状置換**
+2. **AI Provider の CLI 化と agy 対応**
+3. **既存 EliteIntel 機能の日本語環境での完成度向上**
+4. **音声入出力（必要に応じて VOICEVOX）**
+5. **ゲーム操作 / 船体制御**
+6. **HUD / Overlay / VR**
+7. **汎用ゲームデータ・Trade Assistant**
+8. **EDpjKinsaku C-CORE の統合・拡張**
+9. **Installer / Update / Runtime packaging**
+
+## 基本方針
+
+- 現在存在する EliteIntel の機能を先に日本語化する。
+- 日本語化のために既存機能を削除・簡略化しない。
+- C-CORE を理由に既存 EliteIntel の UI / Journal / Navigation / Assistant を作り直さない。
+- C-CORE の判定 Source of Truth は維持する。
+- AI は判定エンジンではなく、説明・要約・推薦・自然言語対話を担当する。
+- AI Provider は API に固定せず、**CLI プロセスを第一級の実装方式**として扱う。
+- `agy` は交換可能な AI Provider の一実装とする。
+- AI Provider の変更で Game Context や C-CORE の内部構造を変更しない。
+- 実装前に read-only 調査を行い、既存コード・仕様・テストを確認する。
+- 各 Phase は小さく実装し、fixture/test を先に追加する。
+
+---
+
+# Phase 0 — 現状固定 / Read-only baseline
+
+## 目的
+
+現在の EliteIntel / EDpjKinsaku の状態を変更せず、現状を固定する。
+
+## 調査対象
+
+- EliteIntel の現在の UI
+- localization resources
+- Journal / Session / Navigation
+- Assistant / LLM 呼び出し部分
+- 音声関連
+- HUD / Overlay / VR
+- EDpjKinsaku C-CORE
+- 既存テスト
+
+## 完了条件
+
+- 既存機能をファイル単位で一覧化できる。
+- 現在の日本語化済み範囲と未翻訳範囲を確定する。
+- 現在の AI 呼び出し方式を確定する。
+- C-CORE の現状 baseline を記録する。
+- この Phase では機能変更を行わない。
+
+---
+
+# Phase 1 — 既存 EliteIntel 機能の日本語化 inventory
+
+## 目的
+
+「新機能を作る」のではなく、**現在の EliteIntel の何を日本語へ置き換える必要があるか**を確定する。
+
+## 対象
+
+- HUD 表示
+- メニュー
+- 設定
+- Journal 表示
+- Navigation
+- Mission
+- Ship status
+- Cargo
+- Exobiology
+- Codex
+- Trade
+- Assistant / AI 表示
+- エラー / 警告 / 状態表示
+- 音声関連表示
+
+## ルール
+
+- 既存キーを優先して利用する。
+- 同じ意味の日本語を複数箇所へ個別実装しない。
+- コード内へ日本語文字列を直接大量に埋め込まない。
+- 既存の localization architecture を利用する。
+- UI の意味を変更せず、表示言語だけを置き換える。
+
+## 完了条件
+
+日本語化対象が「ファイル / localization key / UI 項目」単位で確定していること。
+
+---
+
+# Phase 2 — 既存機能の日本語置換【最優先実装】
+
+## 目的
+
+Phase 1 で確定した現在機能を、日本語 UI として実際に利用可能にする。
+
+## 実装
+
+- 日本語 locale の追加・完成
+- HUD 文言の日本語化
+- Navigation / Mission / Ship / Cargo の日本語化
+- Exobiology / Codex の日本語化
+- エラー・警告・状態表示の日本語化
+- 設定画面の日本語化
+- 既存 Assistant 表示の日本語化
+- 既存機能を日本語環境で一通り操作できる状態にする
+
+## 完了条件
+
+- 現在 EliteIntel に存在する主要機能が日本語 UI で利用できる。
+- 未翻訳の英語 UI が意図せず残っていない。
+- localization test が成功する。
+- 既存機能の挙動を変更していない。
+
+---
+
+# Phase 3 — AI Provider 抽象化 / CLI-first
+
+## 目的
+
+AI/LLM を特定 API に固定せず、**CLI を実行するだけで Provider を交換できる構造**へ変更する。
+
+## Provider Interface
 
 ```text
+Assistant Core
+      ↓
+AIProvider
+      ├─ AgyCliProvider
+      ├─ GeminiCliProvider
+      └─ ClaudeCliProvider
+```
+
+## CLI Provider 共通仕様
+
+Provider は以下を共通化する。
+
+- executable path / command
+- arguments
+- stdin input
+- stdout output
+- stderr capture
+- exit code
+- timeout
+- process cancellation
+- malformed output handling
+- provider unavailable handling
+
+AI Provider は API client を直接呼ぶのではなく、CLI Provider では外部プロセスとして実行する。
+
+## 完了条件
+
+- Assistant Core が特定 LLM 実装を直接参照しない。
+- CLI Provider を設定だけで切り替えられる。
+- Provider の失敗が Assistant Core 全体のクラッシュにならない。
+
+---
+
+# Phase 4 — Antigravity CLI (`agy`) 対応
+
+## 目的
+
+既存 LLM 呼び出しを、**Antigravity CLI (`agy`) へ置換可能**にする。
+
+## 実装
+
+```text
+Game Context
+     ↓
+Assistant Core
+     ↓
+AgyCliProvider
+     ↓
+agy process
+     ↓
+stdout
+     ↓
+Assistant response
+```
+
+## 必須仕様
+
+- `agy` の executable path を設定可能にする。
+- 引数を設定可能にする。
+- Prompt / Game Context を stdin または CLI 引数の定義された方式で渡せるようにする。
+- stdout を AI response として受け取る。
+- stderr を診断情報として分離する。
+- exit code を検証する。
+- timeout を設定可能にする。
+- `agy` が存在しない場合に deterministic command を継続利用できる。
+- `agy` の出力が不正な場合に UI が壊れない。
+- Provider 固有仕様を Game Context / C-CORE に漏らさない。
+
+## API 方針
+
+**AI/LLM の実装方式として外部 API を必須にしない。**
+
+このプロジェクトでは CLI Provider を第一級として扱い、`agy` をその代表実装とする。
+
+## 完了条件
+
+- `agy` を Provider として選択できる。
+- 固定 Game Context fixture を `agy` Provider に渡せる。
+- stdout の回答を Assistant UI へ表示できる。
+- `agy` の失敗時に deterministic command が継続できる。
+
+---
+
+# Phase 5 — 日本語 Assistant / Natural Language
+
+## 目的
+
+日本語化した既存機能を、日本語自然言語で問い合わせられるようにする。
+
+## 例
+
+```text
+> 今どこにいる？
+> 現在の惑星を教えて
+> 貨物の残量は？
+> この惑星で採取できる生物は？
+> 次の目的地まで何ジャンプ？
+```
+
+## 方針
+
+- deterministic command は LLM 不在でも利用可能。
+- LLM は Game Context の説明・要約・推薦を担当する。
+- ゲームの事実は Journal / Status / Session 等から取得する。
+- LLM が事実を捏造して Game Context を上書きすることは禁止する。
+
+---
+
+# Phase 6 — STT / TTS / VOICEVOX
+
+## 目的
+
+日本語 Assistant に音声入出力を追加する。
+
+## 構成
+
+```text
+STT
+ ↓
+Assistant Core
+ ↓
+AI Provider
+ ↓
+日本語 response
+ ↓
+TTS Provider
+ ↓
+VOICEVOX local
+```
+
+## 方針
+
+- STT / TTS は Provider として分離する。
+- VOICEVOX はローカル実行を前提とする。
+- 外部 TTS API を必須依存にしない。
+- VOICEVOX 未起動でもテキスト表示を継続する。
+
+---
+
+# Phase 7 — Game Action / Ship Control
+
+## 目的
+
+自然言語から許可済みのゲーム操作を要求できるようにする。
+
+```text
+Natural language
+      ↓
+AI / Command parser
+      ↓
+Action Registry
+      ↓
+Input Adapter
+      ↓
 Elite Dangerous
-      │ Journal
-      ▼
-EliteIntel
-  ├─ Journal/Event processing
-  │   ├─ FSDJump
-  │   ├─ FSDTarget
-  │   ├─ ScanOrganic
-  │   ├─ Codex
-  │   └─ Location
-  ├─ Session / Body / Navigation
-  └─ HUD / Overlay
-      │
-      │ BodyContext Adapter
-      ▼
-EDpjKinsaku C-CORE
-  ├─ 116 species
-  ├─ 254 rulesets
-  ├─ MATCH
-  ├─ NO_MATCH
-  └─ INSUFFICIENT_DATA
-      │
-      ▼
-EliteIntel HUD
 ```
 
-## Phase 0 — Repo / Build / License baseline
+## 必須仕様
 
-- EliteIntel upstream: `SudoKrondor/EliteIntel`
-- EliteIntel 側で build / test / Java / Gradle / license を確認する。
-- 既存コードを変更せず baseline を確定する。
-- EDpjKinsaku C-CORE は既存の baseline `116 species / 254 rulesets / warnings 0` を維持する。
+- Action Registry
+- Input Adapter
+- キーバインド設定
+- allowlist
+- dry-run
+- 実行結果 verification
 
-BLOCK 1（`docs/PHASE_F_IMPLEMENTATION_DOC_CONSISTENCY_SPEC_V0.1.md` §2/§8）: このセクションが `scripts/check_consistency.py`（F-1）の比較対象となる baseline ブロックを持つ最初の文書。`implemented_*` と `cli_commands` のみが実測値と比較され、`target_*` は比較対象外（同spec §2 ルール3）。
+LLM から直接 OS キーボードイベントを発行することは禁止する。
 
-<!-- baseline:begin -->
-```yaml
-c_core:
-  implemented_genera: 6
-  implemented_rulesets: 65
-  target_genera: 19
-  target_rulesets: 254
-species_value_master:
-  implemented_entries: 114
-  target_entries: 115
-cli_commands: [journal, state, collector, api, calibration, bio]
-```
-<!-- baseline:end -->
+---
 
-完了条件:
+# Phase 8 — HUD / Overlay / VR
 
-- EliteIntel の既存 build / test が成功
-- EDpjKinsaku の既存 C-CORE baseline が成功
-- 外部依存と実行方法を確認
+## 目的
 
-## Phase 1 — EliteIntel read-only inventory
-
-以下を変更せず調査する。
-
-### Journal
-
-- `FSDJumpEvent`
-- `FSDTargetEvent`
-- `ScanOrganicEvent`
-- `LocationTrackingSubscriber`
-- `JumpCompletedSubscriber`
-- `ScanOrganicSubscriber`
-
-### Exobiology
-
-- `BioSampleDto`
-- `BioForms`
-- `ScanOrganicSubscriber`
-- `CodexEntryEventSubscriber`
-
-### HUD
-
-- 既存 Exobiology card
-- `ShipRouteCard`
-- card factory / registry
-- localization
-
-### Session / Navigation
-
-- `SystemSession`
-- current system / body state
-- navigation target
-- route state
-
-完了条件:
-
-`Journal → internal state → exobiology state → HUD` のデータフローをファイル単位で把握する。
-
-## Phase 2 — Japanese localization
-
-EliteIntel の既存 multilingual architecture を利用する。
+日本語 Assistant と同じ Game Context を HUD / Overlay / VR へ表示する。
 
 対象:
 
-- `Language`
-- `MultiLingualTextProvider`
-- `HudText`
-- `SystemSession.getLanguage()`
-- localization resources
-- `HudCardLocalizationTest`
+- Navigation
+- Mission
+- Exobiology
+- Current Body
+- Ship
+- Cargo
+- AI notification
 
-日本語を既存言語切替へ追加し、HUD の翻訳キーが全言語で空にならないことをテストする。
+CLI と HUD で別々の状態取得を行わない。
 
-## Phase 3 — BodyContext Adapter
+---
 
-EliteIntel の Body model を変更せず、薄い Adapter を追加する。
+# Phase 9 — Generic Game Data / Trade Assistant
 
-```text
-EliteIntel Body
-      ↓
-BodyContextAdapter
-      ↓
-EDpjKinsaku BodyContext
-```
+## 目的
 
-EDpjKinsaku `BodyContext`:
+Exobiology 以外の Elite Dangerous 情報も同じ Assistant から扱う。
 
-- `atmosphere`
-- `gravity`
-- `temperature`
-- `pressure`
-- `body_type`
-- `volcanism`
-- `regions`
+対象:
 
-実際の field mapping は EliteIntel の既存 model を調査したうえで確定する。
+- Journal
+- Status
+- Cargo
+- Mission
+- Navigation
+- Station
+- Commodity
+- Trade
+- Exobiology
+- Codex
 
-## Phase 4 — C-CORE integration boundary
+最低限:
 
-EliteIntel が C-CORE の内部 ruleset を直接参照しない境界を作る。
+- commodity 情報
+- station 情報
+- where-to-sell
+- trade route
+- cargo
+- 利益計算
 
-概念:
+---
 
-```python
-class BioScanService:
-    def evaluate_body(self, context) -> list[SpeciesEvaluation]:
-        ...
-```
+# Phase 10 — EDpjKinsaku C-CORE 統合
 
-EliteIntel が認識するのは `SpeciesEvaluation` の結果だけとする。
+## 目的
 
-Java / Python の接続方式は Phase 1 の build / deployment / threading を確認してから決定する。
+既存の日本語化・Assistant 機能が成立した後、EDpjKinsaku C-CORE を Exobiology 判定 Source of Truth として統合する。
 
-第一候補:
-
-- local Python service
-
-候補:
-
-- localhost HTTP
-- JSON stdin/stdout executable
-- Java から Python を直接起動
-
-C-CORE 自体を最初から Java へ port しない。
-
-## Phase 5 — Aleoida vertical slice
-
-最初は Aleoida のみで end-to-end を完成させる。
+## 境界
 
 ```text
-EliteIntel Body
-→ BodyContextAdapter
-→ Aleoida C-CORE
-→ SpeciesEvaluation
-→ existing HUD
-```
-
-HUD 例:
-
-```text
-🧬 EXOBIOLOGY
-Aleoida Arcus       12.9M
-MATCH
-Aleoida Coronamus    6.3M
-NO MATCH
-```
-
-完了条件:
-
-実際の ED Journal / Body state から C-CORE を呼び、結果が既存 HUD に表示される。
-
-## Phase 6 — Collection state
-
-C-CORE の候補判定と、実際の採集状態を分離する。
-
-状態:
-
-- `UNKNOWN`
-- `LOGGED`
-- `SAMPLING`
-- `ANALYSED`
-
-表示例:
-
-```text
-Aleoida Arcus
-MATCH     2/3
-```
-
-`MATCH` は「その Body 条件で候補になる」ことを示し、`2/3` は Journal 上の採集状態を示す。
-
-3/3 は単純な event count だけで確定せず、実際の `Analyse` sequence を確認して扱う。
-
-## Phase 7 — All species
-
-Aleoida の vertical slice 完了後、C-CORE が保持する全 species を EliteIntel から利用可能にする。
-
-EliteIntel 側には genus / species ごとの判定ロジックを追加しない。
-
-現在の C-CORE baseline:
-
-- 19 genus entries
-- 115 species
-- 254 rulesets
-- warnings 0
-
-## Phase 8 — Navigation integration
-
-EliteIntel の既存 Journal/navigation state を利用する。
-
-主な入力:
-
-- `FSDTarget`
-- `RemainingJumpsInRoute`
-- `FSDJump`
-
-Navigation Target と Mission Target は分離する。
-
-Game route の残りジャンプ数と、mission destination の推定ジャンプ数を混同しない。
-
-## Phase 9 — Current Body HUD
-
-C-CORE に渡す BodyContext と同じ情報源を HUD に利用し、表示値と判定値の不一致を避ける。
-
-例:
-
-```text
-🪐 CURRENT BODY
-Gravity     0.14 G
-Temperature 174 K
-Atmosphere  CO₂
-```
-
-## Phase 10 — Exobiology value / ranking
-
-候補種判定が安定した後に価値情報を追加する。
-
-V1 expected value:
-
-`expected_value_base = biological_signal_count × expected_value_per_signal`
-
-`value_confidence`:
-
-- `HIGH`
-- `MEDIUM`
-- `DISPUTED`
-
-判定ロジックと価値ランキングを分離する。
-
-## Phase 11 — AI / TTS（VOICEVOX）
-
-候補種判定・Navigation・Current Body の各情報が安定した後、AIによる推奨・説明を音声で提示する層を追加する。
-
-### 目的
-
-ゲームプレイ中に画面を注視できない場面でも、C-COREの判定結果やNavigation情報をAIが要約し、音声で通知できるようにする。
-
-### アーキテクチャ
-
-```text
-EliteIntel
-   │
-   ├─ Game Context
-   ├─ C-CORE Result
-   └─ Mission / Navigation / Exobiology
+EliteIntel / Game Context
           ↓
-       AI Provider
-       ├─ Gemini CLI
-       └─ Claude CLI
+BodyContext Adapter
           ↓
-      日本語テキスト
+EDpjKinsaku C-CORE
           ↓
-       TTS Provider
+SpeciesEvaluation
           ↓
-       VOICEVOX
-          ↓
-        Speaker
+Assistant / HUD
 ```
 
-4層に分離し、責務を混同しない。
+EliteIntel 側へ C-CORE ruleset をコピーしない。
+
+## 方針
+
+- C-CORE の内部判定を LLM に置き換えない。
+- LLM は C-CORE 結果を説明・要約するだけとする。
+- Java/Python 接続方式は実コード調査後に確定する。
+- 最初から C-CORE を Java へ全面 port しない。
+
+---
+
+# Phase 11 — C-CORE 全 species / Value / Ranking
+
+C-CORE 統合が安定した後に実施する。
+
+- 全 species 利用
+- collection state
+- expected value
+- ranking
+- confidence
+
+判定と価値評価を分離する。
+
+---
+
+# Phase 12 — Offline Assistant
+
+## 構成
 
 ```text
-C-CORE      = 判定
-EliteIntel  = ゲーム状態・UI
-Gemini/Claude = 推奨・説明
-VOICEVOX    = 音声化
+Ollama CLI / local provider
+        ↓
+Assistant Core
+        ↓
+VOICEVOX local
 ```
 
-VOICEVOXを「AIそのもの」として扱わない。VOICEVOXはTTS Providerの一実装であり、AIの判断・回答生成には関与しない。
+ネットワーク接続なしでも、可能な範囲で日本語 Assistant を利用できる構成を完成させる。
 
-### 設計方針
+---
 
-- AIの判断・回答生成は Gemini CLI / Claude CLI が担う
-- 音声合成は VOICEVOX が担う
-- VOICEVOX はローカル Windows 上で実行し、**外部 TTS API は使用しない**
-- 音声出力は任意機能とする。VOICEVOXが無効・未起動でもテキスト表示のみで動作する
-- TTS を抽象化する TTS Provider 層を設け、将来的に別の音声エンジンへ交換可能にする（VOICEVOX を C-CORE / EliteIntel 本体へ直接埋め込まない）
-- 音声読み上げ用の AI 回答は短く簡潔にする
-- ゲームプレイ中の通知・推奨・警告などを対象に音声化する
+# Phase 13 — Installer / Update / Runtime packaging
 
-### 例
+- Windows runtime package
+- CLI launcher
+- `agy` executable configuration
+- AI Provider configuration
+- TTS configuration
+- optional HUD / VR
+- version information
+- update mechanism
+
+---
+
+# AI Provider 仕様
+
+## Provider は交換可能であること
 
 ```text
-「現在の惑星では、Aleoida Arcusが候補です。採取を続ける価値があります。」
-      ↓
-   VOICEVOX（例: 青山龍星）
-      ↓
-    音声出力
+AIProvider
+ ├─ AgyCliProvider
+ ├─ GeminiCliProvider
+ ├─ ClaudeCliProvider
+ └─ OllamaCliProvider
 ```
 
-話者（ボイス）はTTS Provider層の設定として扱い、差し替えてもシステム設計を変更する必要がないようにする。
+Provider の差し替えで以下を変更してはならない。
 
-### ライセンス・クレジット
+- Game Context schema
+- C-CORE
+- Journal state
+- HUD renderer
+- Action Registry
 
-VOICEVOXおよび各音声ライブラリは無料で利用できるが、音声ライブラリごとに利用規約・クレジット表記の条件が異なる。使用する音声ライブラリの利用規約・クレジット条件を仕様書に明記し、遵守する。
+## CLI Provider の最低契約
 
-### 完了条件
-
-- C-CORE判定結果を含むAI回答が生成される
-- AI回答がVOICEVOX経由で音声出力される
-- VOICEVOX未起動時もテキスト表示のみで動作が継続する
-- 使用する音声ライブラリの利用規約・クレジット表記が明記されている
-
-## HUD 最終イメージ
+入力:
 
 ```text
-┌──────────────────────────────┐
-│ 🚀 NAVIGATION                │
-│ 現在    HIP 12345            │
-│ 目的地  Sol                  │
-│ 残り    17 jumps             │
-├──────────────────────────────┤
-│ 🧬 EXOBIOLOGY                │
-│ Aleoida Arcus       12.9M    │
-│ MATCH               2/3      │
-│ Aleoida Gravis       12.9M   │
-│ MATCH               0/3      │
-├──────────────────────────────┤
-│ 🪐 CURRENT BODY              │
-│ Gravity     0.14 G           │
-│ Temperature 174 K            │
-│ Atmosphere  CO₂              │
-└──────────────────────────────┘
+Game Context + user prompt
 ```
 
-## Testing
+出力:
 
-### EDpjKinsaku
+```text
+Japanese response
+```
 
-- `pytest -q`
-- BioScan baseline: `19 / 115 / 254 / 0`
-- C-CORE fixture tests
-- fixed BodyContext integration tests
+エラー:
 
-### EliteIntel
+```text
+process unavailable
+non-zero exit
+timeout
+malformed output
+```
 
-- existing tests
-- Japanese localization tests
-- BodyContext Adapter field mapping tests
-- C-CORE integration tests
-- Journal replay / persistence tests
-- real-game test
-- AI Provider / TTS Provider abstraction tests（VOICEVOX未起動時にテキスト表示へフォールバックすることを含む）
+これらを共通エラーとして Assistant Core が処理する。
 
-実ゲームだけをテスト基準にせず、固定 fixture で C-CORE との接続を先に検証する。
+---
 
-## Non-goals
+# 実装順の判断基準
 
-- 116 species の判定ロジックを EliteIntel にコピーしない
-- EliteIntel の Journal handling を全面的に書き直さない
-- 新しい HUD を別プロジェクトとして作らない
-- 初期段階で C-CORE を Java へ全面 port しない
-- C-CORE に合わせるため EliteIntel の Session model を無理に変更しない
-- 実ゲームテストだけに依存しない
-- VOICEVOX（TTS）を AI の判断・回答生成そのものとして扱わない
-- 外部 TTS API に依存させない（VOICEVOX はローカル実行を前提とする）
+**「新しい内部 core を作ること」より「現在使われている機能を日本語で使えること」を常に優先する。**
 
-## Commit sequence proposal
+したがって、C-CORE が未完成でも Phase 2〜9 の UI / Assistant / CLI / 音声 / 操作 / HUD を進めてよい。
 
-1. `chore: fork and verify EliteIntel build`
-2. `feat(i18n): add Japanese language support`
-3. `refactor(bio): add BodyContext adapter boundary`
-4. `feat(bio): integrate Aleoida C-CORE`
-5. `feat(bio): display exobiology evaluation in HUD`
-6. `feat(bio): integrate collection state`
-7. `feat(bio): integrate all C-CORE species`
-8. `feat(hud): add navigation and body information`
-9. `feat(bio): add exobiology value ranking`
-10. `feat(ai): add AI provider and TTS provider abstraction (VOICEVOX)`
+C-CORE 統合は、既存機能の日本語化を止めるブロッカーにしない。
 
-## First implementation step
+---
 
-まず Phase 0–1 の read-only inventory と build/test baseline を実施する。
+# テスト方針
 
-この段階では EliteIntel のコード変更を行わず、既存構造と C-CORE の接続点を確定してから Phase 2 以降へ進む。
+## Phase 0–2
+
+- 既存 build/test
+- localization key coverage
+- 日本語 locale test
+- HUD / menu / settings の表示確認
+- 既存機能の回帰テスト
+
+## Phase 3–5
+
+- Provider interface test
+- CLI process test
+- stdin/stdout fixture
+- exit code test
+- timeout test
+- malformed output test
+- `agy` unavailable fallback
+- 日本語 prompt / response test
+
+## Phase 6
+
+- STT provider test
+- TTS provider test
+- VOICEVOX unavailable fallback
+
+## Phase 7
+
+- Action allowlist test
+- dry-run test
+- verification test
+- 禁止操作 test
+
+## Phase 8–9
+
+- Game Context consistency
+- HUD rendering
+- Navigation / Mission / Cargo / Trade fixtures
+
+## Phase 10–12
+
+- BodyContext mapping
+- C-CORE fixture
+- SpeciesEvaluation preservation
+- C-CORE result が AI に改変されないこと
+- offline provider test
+
+---
+
+# 非目標
+
+- LLM に Exobiology species 判定をさせない。
+- LLM の回答をゲーム事実の Source of Truth にしない。
+- C-CORE ruleset を EliteIntel 側へコピーしない。
+- LLM から直接 OS キーボードイベントを発行しない。
+- 日本語化より先に C-CORE を完成させることを要求しない。
+- AI/LLM を特定の外部 API に固定しない。
+- HUD / VR の実装を CLI の責務へ混在させない。
+
+---
+
+# 現在の優先作業
+
+**次に実装するのは Phase 0 の read-only inventory → Phase 1 の日本語化対象確定 → Phase 2 の既存機能日本語置換。**
+
+その後、Phase 3–4 で `AgyCliProvider` を追加し、現在の LLM 実装を `agy` CLI に差し替えられる状態を作る。
+
+C-CORE の追加・拡張は、その後でよい。
