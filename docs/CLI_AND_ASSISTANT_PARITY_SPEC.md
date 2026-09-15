@@ -1,256 +1,235 @@
-# EDpjKinsaku / EliteIntel 機能拡張仕様
+# EDpjKinsaku / EliteIntel 機能パリティ仕様
 
 ## 目的
 
-既存の「Exobiology C-CORE に特化した CLI」という位置づけを拡張し、EliteIntel の LLM アシスタントで利用できる主要機能を、EDpjKinsaku 側でも段階的に利用可能にする。
+本仕様の目的は、EDpjKinsaku を C-CORE だけの独立ソフトとして拡張することではない。
 
-本仕様では、CLI を単なる C-CORE 検証コマンドとして終了させず、**ゲーム状態取得・自然言語対話・ゲーム操作・HUD/VR・汎用ゲームデータ解析・音声入出力**を分離した拡張可能なアシスタント基盤として定義する。
+**優先するのは、現在の EliteIntel が持つユーザー向け機能・表示・操作を日本語環境へ置き換えること。**
 
-ただし、C-CORE の判定ロジックを LLM に移すことは禁止する。
+そのうえで、既存の AI/LLM 部分を特定 API に固定せず、**CLI Provider として差し替え可能にし、Antigravity CLI (`agy`) を利用できるようにする**。
+
+EDpjKinsaku C-CORE の Exobiology 判定は Source of Truth として維持するが、既存機能の日本語置換より後回しとする。
+
+## 優先順位
+
+1. 現在の EliteIntel 機能を日本語へ置換
+2. 日本語 UI の回帰テストと未翻訳箇所の解消
+3. AI Provider の CLI-first 抽象化
+4. `agy` CLI Provider の実装
+5. 日本語自然言語 Assistant
+6. STT / TTS / VOICEVOX
+7. Game Action / Ship Control
+8. HUD / Overlay / VR
+9. Journal / Trade 等の汎用分析
+10. EDpjKinsaku C-CORE 統合・全 species / value / ranking
+11. Offline / packaging / installer
 
 ## 設計原則
 
-1. C-CORE は Exobiology の判定 Source of Truth とする。
-2. LLM は推奨・説明・自然言語対話を担当し、ゲーム状態の事実を勝手に生成しない。
-3. ゲーム操作は明示的な Command / Action 層を介して実行する。
-4. CLI、GUI/HUD、VR、音声は表示・入出力層として分離する。
-5. 外部 TTS API は使用せず、ローカル TTS Provider を利用可能にする。
-6. Gemini CLI / Claude CLI / Ollama は AI Provider として交換可能にする。
-7. CLI 単体でも主要な情報取得・分析・自然言語対話を完結できるようにする。
-8. ゲームへの直接操作を追加する場合は、操作可能なコマンドを明示的な allowlist として管理する。
-9. 既存 C-CORE の ruleset を EliteIntel 側へ複製しない。
-10. 実装は各 Phase ごとに fixture/test を追加し、実ゲーム依存を最小化する。
+1. 現在の機能を先に日本語化し、同等機能を後から作り直す順序にしない。
+2. 日本語化は UI の意味・挙動を変更せず、表示言語を置き換える。
+3. 既存 localization architecture を優先する。
+4. AI は説明・要約・推薦・自然言語対話を担当する。
+5. ゲーム状態の事実は Journal / Status / Session 等を Source of Truth とする。
+6. AI Provider は交換可能にする。
+7. CLI Provider は外部プロセスとして実行できることを共通契約にする。
+8. `agy` を第一級の CLI Provider として扱う。
+9. AI/LLM の利用に外部 API を必須化しない。
+10. C-CORE の species 判定を LLM に委譲しない。
+11. C-CORE ruleset を EliteIntel 側へ複製しない。
+12. LLM から直接 OS キーボードイベントを発行しない。
 
-## 機能目標
+---
 
-### A. 音声入出力
+# A. 現在の EliteIntel 機能の日本語置換
 
-- STT Provider 層を追加する。
-- 音声入力を CLI / Assistant Command に変換する。
-- TTS Provider 層を追加する。
-- VOICEVOX をローカル TTS Provider として利用する。
-- STT/TTS を無効にしてもテキスト CLI は動作する。
-- 将来、別 STT/TTS エンジンへ交換可能にする。
+## 対象
 
-### B. 自然言語対話
-
-AI Provider 層を追加し、以下を交換可能にする。
-
-- Gemini CLI
-- Claude CLI
-- Ollama
-
-AI Provider に渡す情報は Game Context として構造化する。
-
-```text
-Game Context
- ├─ System
- ├─ Body
- ├─ Ship
- ├─ Cargo
- ├─ Mission
- ├─ Navigation
- ├─ Exobiology
- └─ Journal events
-       ↓
-    AI Provider
-       ↓
- Japanese response
-```
-
-LLM に渡してよい事実と、C-CORE が確定した結果を区別する。
-
-### C. ゲーム状態の汎用取得
-
-Journal / Status / 補助データを統合し、少なくとも以下を CLI から問い合わせ可能にする。
-
-- 現在星系
-- 現在惑星 / Body
-- 船情報
-- Cargo / Cargo 残量
-- Mission
-- Navigation Target
-- Remaining Jumps
-- Trade 情報
-- Station 情報
-- Exobiology
-- Codex
-
-例:
-
-```text
-> status
-> where am i
-> current body
-> cargo
-> mission
-> route
-> exobiology
-```
-
-### D. 交易・売却先分析
-
-Exobiology 専用 CLI から汎用ゲーム分析 CLI へ拡張する。
-
-最低限:
-
-- commodity 情報取得
-- station 情報取得
-- where-to-sell 相当の検索
-- trade route 情報
-- cargo 状態
-- 利益計算
-
-分析結果は構造化 JSON と人間向けテキストの両方を提供する。
-
-### E. ゲーム操作
-
-CLI からゲーム操作を要求できる Action 層を追加する。
-
-例:
-
-```text
-> deploy landing gear
-> retract landing gear
-> deploy cargo scoop
-> engage supercruise
-> engage fsd
-```
-
-操作は LLM が直接キーコードを発行するのではなく、必ず Action Registry を経由する。
-
-```text
-Natural language
-      ↓
-AI / Command parser
-      ↓
-Action Registry
-      ↓
-Validated game action
-      ↓
-Input adapter
-      ↓
-Elite Dangerous
-```
-
-危険操作・戦闘操作等は安全ポリシーによって別途制限する。
-
-### F. HUD / Overlay
-
-CLI だけでなく、同一 Game Context を利用する表示層を追加する。
-
-```text
-Game Context
- ├─ CLI renderer
- ├─ HUD renderer
- └─ VR renderer
-```
-
-既存 EliteIntel の HUD に相当する以下を表示可能にする。
-
+- HUD
+- メニュー
+- 設定
+- Journal
 - Navigation
-- Exobiology
-- Current Body
 - Mission
 - Ship status
 - Cargo
-- AI notification
+- Exobiology
+- Codex
+- Trade
+- Assistant / AI 表示
+- エラー / 警告 / 状態表示
+- 音声関連 UI
 
-CLI と HUD で別々のゲーム状態を取得しない。
+## 完了条件
 
-### G. VR
+- 現在の主要機能を日本語 UI で利用できる。
+- 既存機能を削除・簡略化していない。
+- localization key coverage が通る。
+- 既存テストが通る。
 
-VR 表示は CLI プロセスへ直接実装せず、Overlay / VR renderer として分離する。
+---
 
-CLI は表示データを提供し、VR renderer が SteamVR 等の描画を担当する。
+# B. AI Provider / CLI-first
 
-### H. オフライン AI
-
-Ollama を AI Provider の候補として実装する。
+AI を特定サービスの API client に固定しない。
 
 ```text
-AI Provider
- ├─ Gemini CLI
- ├─ Claude CLI
- └─ Ollama
+Assistant
+   ↓
+AIProvider
+   ├─ AgyCliProvider
+   ├─ GeminiCliProvider
+   ├─ ClaudeCliProvider
+   └─ OllamaCliProvider
 ```
 
-Provider 選択は設定で変更可能とし、特定 Provider の API 仕様を C-CORE や Game Context に直接持ち込まない。
+Provider の最低契約:
 
-## Phase 12 — Assistant Core / CLI conversation
+```text
+input  = Game Context + user prompt
+output = Japanese response
+```
 
-### 目的
+共通して扱う状態:
 
-C-CORE 検証 CLI を、継続対話可能な Assistant CLI に拡張する。
+- process unavailable
+- non-zero exit
+- timeout
+- cancellation
+- malformed output
 
-### 実装
+---
 
-- REPL を追加する。
-- `status` / `where` / `body` / `cargo` / `mission` / `route` / `exobiology` を統一 Command Interface にする。
-- Game Context を JSON で取得可能にする。
-- AI Provider Interface を追加する。
-- Gemini CLI / Claude CLI / Ollama の Provider 境界を定義する。
-- LLM の出力を事実データとして保存しない。
+# C. Antigravity CLI (`agy`) 置換仕様
 
-### 完了条件
+## 目的
 
-- CLI から継続的に質問できる。
-- Game Context を取得できる。
-- Provider を切り替えられる。
-- LLM 未起動時も deterministic command が利用できる。
+既存の LLM 呼び出し部分を `agy` CLI に差し替えられるようにする。
 
-## Phase 13 — STT / TTS / VOICEVOX
+```text
+Game Context
+    ↓
+Assistant Core
+    ↓
+AgyCliProvider
+    ↓
+agy process
+    ↓
+stdout
+    ↓
+Assistant response
+```
 
-### 目的
+## 必須要件
 
-CLI Assistant に音声入出力を追加する。
+- `agy` executable path を設定可能
+- CLI arguments を設定可能
+- Prompt / Game Context を定義された入力方式で渡せる
+- stdout と stderr を分離
+- exit code を確認
+- timeout を設定可能
+- process cancellation を扱う
+- `agy` 不在時も deterministic command を継続
+- 不正な `agy` 出力で UI を壊さない
+- Provider 固有仕様を Game Context に持ち込まない
 
-### 実装
+## 禁止
 
-- STT Provider Interface
-- TTS Provider Interface
-- 音声入力 → Command/Prompt
-- AI response → TTS
-- VOICEVOX local provider
-- 未起動時のテキスト fallback
+- Game Context を `agy` 専用形式へ固定する
+- C-CORE を `agy` の prompt に置き換える
+- `agy` の回答をゲーム状態の Source of Truth とする
+- AI API を必須依存に戻す
 
-### 完了条件
+---
 
-- 音声で質問できる。
-- 音声で Command を要求できる。
-- AI 回答を VOICEVOX で読み上げられる。
-- VOICEVOX が利用できなくても CLI は継続動作する。
+# D. 日本語自然言語 Assistant
 
-## Phase 14 — Game Action / Ship Control
+日本語化された既存機能を自然言語から問い合わせ可能にする。
 
-### 目的
+例:
 
-EliteIntel の船体制御に相当する機能を追加する。
+```text
+今どこにいる？
+現在の惑星は？
+貨物の残量は？
+次の目的地まで何ジャンプ？
+この惑星で何を採取できる？
+```
 
-### 実装
+deterministic command は AI Provider がなくても利用可能とする。
+
+---
+
+# E. 音声
+
+```text
+STT
+ ↓
+Assistant
+ ↓
+AI Provider
+ ↓
+Japanese response
+ ↓
+TTS Provider
+ ↓
+VOICEVOX local
+```
+
+- STT / TTS を Provider として分離する。
+- VOICEVOX はローカル実行を前提とする。
+- VOICEVOX が使えない場合はテキスト表示へフォールバックする。
+- 外部 TTS API を必須依存にしない。
+
+---
+
+# F. Game Action / Ship Control
+
+自然言語から許可済み Action を要求できるようにする。
+
+```text
+Natural language
+ ↓
+Command parser
+ ↓
+Action Registry
+ ↓
+Input Adapter
+ ↓
+Elite Dangerous
+```
 
 - Action Registry
-- Input Adapter
+- allowlist
 - キーバインド設定
-- 操作 allowlist
-- dry-run mode
-- 実行結果の verification
+- dry-run
+- 実行結果 verification
 
-LLM が直接 OS のキーボード入力を操作することは禁止する。
+LLM が直接 OS の入力イベントを発行することは禁止する。
 
-### 完了条件
+---
 
-- 定型マクロ名を知らなくても自然言語から許可済み Action を実行できる。
-- 操作前後の状態を検証できる。
-- dry-run で実行内容を確認できる。
+# G. HUD / Overlay / VR
 
-## Phase 15 — Generic Game Data / Trade Assistant
+CLI と HUD / Overlay / VR は同一 Game Context を使用する。
 
-### 目的
+対象:
 
-Exobiology 専用分析から Elite Dangerous 全般のゲーム情報分析へ拡張する。
+- Navigation
+- Mission
+- Exobiology
+- Current Body
+- Ship
+- Cargo
+- AI notification
 
-### 対象
+描画責務を CLI / Assistant Core に混在させない。
+
+---
+
+# H. 汎用ゲームデータ分析
+
+同一 Assistant Context から以下を扱えるようにする。
 
 - Journal
 - Status
@@ -263,181 +242,82 @@ Exobiology 専用分析から Elite Dangerous 全般のゲーム情報分析へ�
 - Exobiology
 - Codex
 
-### 完了条件
+最低限:
 
-- where-to-sell 相当の問い合わせが CLI から可能。
-- 交易情報を取得・計算できる。
-- Mission / Navigation / Cargo / Exobiology を同一 Assistant Context から問い合わせられる。
+- commodity 情報
+- station 情報
+- where-to-sell
+- trade route
+- cargo
+- 利益計算
 
-## Phase 16 — HUD / Overlay / VR renderer
+---
 
-### 目的
+# I. C-CORE 統合
 
-CLI と同一の Game Context を HUD / VR に表示する。
-
-### 実装
-
-- Renderer Interface
-- HUD renderer
-- Overlay renderer
-- VR renderer boundary
-- AI notification display
-
-### 完了条件
-
-- CLI と HUD が同じ Game Context を使用する。
-- Navigation / Exobiology / Current Body / Mission が表示される。
-- AI の通知を表示できる。
-- VR renderer を独立した表示層として交換できる。
-
-## Phase 17 — Integrated Assistant / Offline mode
-
-### 目的
-
-全機能を一つの Assistant として統合する。
+日本語化・Assistant・CLI Provider の基盤が成立した後に実施する。
 
 ```text
-Elite Dangerous
-      ↓
-Journal / Status
-      ↓
-Game Context
-      ├──────────────┐
-      ↓              ↓
-C-CORE           Assistant Core
-      ↓              │
-Exobiology          ├─ Command
-      │              ├─ AI Provider
-      │              ├─ STT Provider
-      │              └─ TTS Provider
-      │                    ↓
-      └──────────────→ HUD / VR / CLI
+EliteIntel Game Context
+        ↓
+BodyContext Adapter
+        ↓
+EDpjKinsaku C-CORE
+        ↓
+SpeciesEvaluation
+        ↓
+Assistant / HUD
 ```
 
-### AI Provider
+C-CORE は Exobiology 判定の Source of Truth とする。
 
-- Gemini CLI
-- Claude CLI
-- Ollama
+LLM は C-CORE の判定結果を変更せず、説明・要約・推薦だけを行う。
 
-### TTS Provider
+---
 
-- VOICEVOX local
+# 機能パリティ目標
 
-### 完了条件
-
-- オフライン構成では Ollama + VOICEVOX を利用できる。
-- クラウド AI を選択した場合も Game Context / C-CORE 境界は同一である。
-- CLI、HUD、VR、音声が同一 Assistant Core を利用する。
-- C-CORE の判定結果が LLM によって改変されない。
-
-## Phase 18 — Installer / Update / Runtime packaging
-
-### 目的
-
-独自 CLI / Assistant を実運用可能なアプリケーションとして配布する。
-
-### 実装
-
-- Windows runtime package
-- CLI launcher
-- configuration management
-- AI Provider configuration
-- TTS configuration
-- optional HUD/VR components
-- version information
-- update mechanism
-
-GUI installer は必須依存ではなく、CLI launcher 単体でも起動可能とする。
-
-### 完了条件
-
-- クリーン環境へ導入できる。
-- CLI 単体で起動できる。
-- Provider 設定を変更できる。
-- 各コンポーネントを個別に無効化できる。
-
-## 機能パリティ目標
-
-| 機能 | 現在のCLI | 拡張後 |
+| 機能 | 現状 | 目標 |
 |---|---:|---:|
-| テキストCLI | ○ | ○ |
+| 既存 EliteIntel UI | 既存 | 日本語置換 |
+| Text CLI | ○ | ○ |
 | C-CORE Exobiology | ○ | ○ |
-| 自然言語対話 | × | ○ |
+| 日本語自然言語対話 | × | ○ |
+| `agy` CLI | × | ○ |
 | Gemini CLI | × | ○ |
 | Claude CLI | × | ○ |
-| Ollama | × | ○ |
+| Ollama CLI | × | ○ |
 | STT | × | ○ |
 | TTS | × | ○ |
 | VOICEVOX | × | ○ |
-| 船体操作 | × | ○ |
-| Journal分析 | △ | ○ |
-| Trade分析 | × | ○ |
-| where-to-sell | × | ○ |
-| Mission分析 | △ | ○ |
+| Ship Control | × | ○ |
+| Journal Analysis | △ | ○ |
+| Mission Analysis | △ | ○ |
 | Navigation | △ | ○ |
-| HUD | × | ○ |
-| Overlay | × | ○ |
+| Trade / where-to-sell | × | ○ |
+| HUD / Overlay | × | ○ |
 | VR | × | ○ |
-| オフライン運用 | C-COREのみ | ○ |
-| インストーラー | × | ○ |
-| 自動更新 | × | ○ |
+| Offline Assistant | C-COREのみ | ○ |
+| Installer / Update | × | ○ |
 
-## 非目標
+---
 
-- LLM に Exobiology の species 判定をさせる。
-- LLM の回答を Source of Truth とする。
-- C-CORE ruleset を EliteIntel 側へコピーする。
+# 非目標
+
+- LLM に species 判定をさせる。
+- LLM をゲーム事実の Source of Truth にする。
+- C-CORE ruleset を EliteIntel へコピーする。
+- AI Provider を外部 API に固定する。
 - LLM から直接キーボードイベントを発生させる。
-- HUD / VR のために CLI の責務へ描画コードを混在させる。
-- 外部 TTS API を必須依存にする。
+- 日本語化より先に C-CORE を完成させることを要求する。
+- HUD / VR の描画責務を CLI へ混在させる。
 
-## テスト方針
+---
 
-各 Phase で fixture test を先に実施する。
+# 実装順
 
-### CLI
+**最初に現在の EliteIntel の機能を日本語へ置き換える。**
 
-- REPL command tests
-- JSON output tests
-- Game Context tests
-- Provider selection tests
+日本語化が一段落した後に、AI Provider 抽象化 → `AgyCliProvider` → 日本語自然言語 Assistant の順で進める。
 
-### AI
-
-- deterministic context fixture
-- provider failure fallback
-- malformed response handling
-- C-CORE result preservation
-
-### Game Action
-
-- allowlist tests
-- dry-run tests
-- action verification tests
-
-### Audio
-
-- STT provider tests
-- TTS provider tests
-- VOICEVOX unavailable fallback
-
-### HUD / VR
-
-- renderer contract tests
-- Game Context consistency tests
-- AI notification rendering tests
-
-## フェーズ実装順
-
-既存 Phase 0–11 の完了後、以下を順番に実施する。
-
-12. Assistant Core / CLI conversation
-13. STT / TTS / VOICEVOX
-14. Game Action / Ship Control
-15. Generic Game Data / Trade Assistant
-16. HUD / Overlay / VR renderer
-17. Integrated Assistant / Offline mode
-18. Installer / Update / Runtime packaging
-
-**Phase 12–18 は、Phase 11 の AI/TTS 仕様を置き換えるものではなく、CLI・音声・操作・表示・配布まで含めた機能拡張として追加する。**
+C-CORE 統合は後段であり、日本語化・既存機能置換のブロッカーにしない。
